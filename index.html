@@ -100,6 +100,7 @@ ol.pl .k.pd small{color:#9a4d00;font-weight:bold}
 .chips button.pend.on{background:var(--orange);border-color:var(--orange)}
 .stick{position:sticky;bottom:-14px;background:#fff;padding:10px 0 4px;margin-top:6px}
 .big{font-size:26px;font-weight:bold;text-align:center;min-height:58px}
+.okbox{background:#DDEFD5;border:1px solid #b7dba8;color:var(--ok);border-radius:10px;padding:8px 10px;font-size:13.5px}
 .row2{display:flex;gap:8px}
 .row2>*{flex:1}
 .prev{margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff;border:1px dashed var(--taupe);text-align:center;font-size:17px;color:var(--brown);font-weight:bold;min-height:42px}
@@ -326,29 +327,44 @@ async function fetchT(url,opt={},ms=30000){
   try{ return await fetch(url,Object.assign({signal:ac.signal},opt)); } finally{ clearTimeout(t); ACS.delete(ac); }
 }
 function payloadDe(h){
-  return { key:CFG.CLAVE, action:"hoja", id:h.id, planta:CFG.PLANTA, puerta:h.puerta, fecha:h.fecha, placa:h.placa, responsable:h.responsable, estado:h.estado,
+  return { key:CFG.CLAVE, action:"hoja", id:h.id, sede:CFG.PLANTA, planta:CFG.PLANTA, puerta:h.puerta, fecha:h.fecha, placa:h.placa, responsable:h.responsable, estado:h.estado,
     pesadas:(h.pesadas||[]).map((p,i)=>({n:i+1,cod:p.cod,res:p.res,cat:p.cat,bruto:p.bruto,tara:p.taraPend?"":(p.tara||0),taraPend:!!p.taraPend,neto:netoDe(p),uni:p.uni||"",tu:p.uni?(p.tu||"UD"):"",ts:p.ts})) };
 }
 let syncing=null, lastErr="";
+const DESPQ="pesaje.despq";    // despachos con datos por enviar: {clave: payload}
+async function postJ(obj,ms=60000){
+  const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(obj)},ms);
+  return r.json();
+}
 async function syncRun(){
   if(!CFG.SCRIPT_URL || !navigator.onLine) return;
+  lastErr="";
   for(const h of HOJAS.filter(dirty).sort((a,b)=>(a.act||0)-(b.act||0))){
     const sent=h.rev; let j;
-    try{
-      const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payloadDe(h))},60000);
-      j=await r.json();
-    }catch(e){ break; }                      // sin señal: se reintenta luego
-    if(j&&j.ok){ lastErr=""; h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
-    else { lastErr=(j&&j.error)||"error"; break; }
+    try{ j=await postJ(payloadDe(h)); }catch(e){ return; }          // sin señal: se reintenta luego
+    if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
+    else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
+    else { lastErr=(j&&j.error)||"error"; return; }
+  }
+  const q=LS.get(DESPQ,{});
+  for(const k of Object.keys(q)){
+    let j; try{ j=await postJ(q[k]); }catch(e){ return; }
+    if(j&&(j.ok||j.error==="aprobado")){
+      const q2=LS.get(DESPQ,{}); if(JSON.stringify(q2[k])===JSON.stringify(q[k])) delete q2[k]; LS.set(DESPQ,q2);
+      if(j.error==="aprobado") lastErr="aprobado";
+    } else { lastErr=(j&&j.error)||"error"; return; }
   }
 }
 function sync(){
   if(syncing) return syncing;
-  syncing=syncRun().catch(()=>{}).then(()=>{ syncing=null; drawQueue(); drawHojas(); if(lastErr==="clave") toast("La clave no coincide con la de la hoja de Google."); });
+  syncing=syncRun().catch(()=>{}).then(()=>{ syncing=null; drawQueue(); drawHojas();
+    if(lastErr==="clave") toast("La clave no coincide con la de la hoja de Google.");
+    if(lastErr==="aprobado") toast("Ese despacho ya fue aprobado: el cambio no se envió. Pide que lo reabran.");
+  });
   return syncing;
 }
 function drawQueue(){
-  const n=HOJAS.filter(dirty).length, c=$("#chip-q");
+  const n=HOJAS.filter(dirty).length+Object.keys(LS.get(DESPQ,{})).length, c=$("#chip-q");
   const show = CFG.SCRIPT_URL && n;
   c.classList.toggle("hidden",!show);
   c.textContent = show?`⏳ ${n} por enviar`:"";
@@ -574,12 +590,12 @@ function buildDespacho(hojas){
 async function consultarDespacho(){
   const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), e=$("#d-err"); e.textContent="";
   if(!fecha||placa.length<5) return void(e.textContent="Elige la fecha y escribe la placa.");
-  let hojas=[], origen="Solo hojas de este equipo";
+  let hojas=[], origen="Solo hojas de este equipo"; DSRV=null;
   if(CFG.SCRIPT_URL && navigator.onLine){
     try{
-      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
+      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
       const j=await r.json();
-      if(j&&j.ok){ hojas=j.hojas||[]; origen="Hojas de todas las puertas (Google Sheets)"; }
+      if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; origen="Hojas de todas las puertas (Google Sheets)"; }
       else e.textContent="No se pudo consultar la hoja de Google ("+((j&&j.error)||"error")+"). Se muestran solo las de este equipo.";
     }catch(x){ e.textContent="Sin conexión con la hoja de Google. Se muestran solo las de este equipo."; }
   }
@@ -635,13 +651,15 @@ function drawDespacho(fecha,placa,hojas,origen){
     body+=`<tr><td>${r.cod?`<small>${r.cod}</small><br>`:""}${esc(r.res)}${r.pend?" ⚠":""}</td>${porPuerta.map(p=>`<td class="num">${r.pp[p]!=null?fmt(r.pp[p]):""}</td>`).join("")}<td class="num"><b>${fmt(r.total)}</b></td><td class="num">${esc(uniTxt(r.uni))}</td></tr>`;
   });
   const hayPel=filas.some(r=>r.cat==="Peligrosos"), hayNo=filas.some(r=>r.cat!=="Peligrosos");
+  HP=hayPel; HN=hayNo; DHOJAS=hojas; DFILAS=filas;
+  cargarDesp(fecha,placa,DSRV);
   const tipoRes = hayPel&&hayNo ? "No peligrosos y peligrosos" : hayPel ? "Peligrosos" : hayNo ? "No peligrosos" : "";
   const tp=porPuerta.map(p=>r2(filas.reduce((a,r)=>a+(r.pp[p]||0),0)));
   const gt=r2(tp.reduce((a,b)=>a+b,0));
   $("#d-out").innerHTML = `
     <div class="card noprint"><div class="muted">${esc(origen)}</div><div class="st">${st}</div>
       ${pend?`<div class="warnbox">⚠ Hay ${pend} pesada${pend>1?"s":""} con tara pendiente: el consolidado incluye su peso bruto.</div>`:""}
-      <div class="muted" style="margin-top:8px">Datos del despacho (salen en la hoja impresa):</div>
+      <div class="muted" style="margin-top:8px">Datos del despacho (salen en la hoja impresa y pasan al Registro Interno):</div>
       <div class="row2">
         <div><label class="f" for="p-op">Empresa operadora</label><input id="p-op" class="in" autocomplete="off"></div>
         <div><label class="f" for="p-cond">Conductor</label><input id="p-cond" class="in" autocomplete="off"></div>
@@ -650,26 +668,115 @@ function drawDespacho(fecha,placa,hojas,origen){
         <div><label class="f" for="p-brev">Brevete</label><input id="p-brev" class="in" autocomplete="off"></div>
         <div><label class="f" for="p-hora">Hora de llegada</label><input id="p-hora" class="in" type="time"></div>
       </div>
-      <label class="f" for="p-man">Tipo de manejo</label>
-      <select id="p-man" class="in"><option value="">— elegir —</option>${(CFG.TIPOS_MANEJO||[]).map(t=>`<option>${esc(t)}</option>`).join("")}</select>
+      ${HN||!HP?`<label class="f" for="p-man">Tipo de manejo${HP?" (no peligrosos)":""}</label>
+      <select id="p-man" class="in"><option value="">— elegir —</option>${MANEJOS.map(([c,t])=>`<option value="${c}">${esc(t)} (${c})</option>`).join("")}</select>`:""}
+      ${HP?`<label class="f" for="p-manp">Tipo de manejo (peligrosos)</label>
+      <select id="p-manp" class="in"><option value="">— elegir —</option>${MANEJOS.map(([c,t])=>`<option value="${c}">${esc(t)} (${c})</option>`).join("")}</select>`:""}
       <label class="f" for="p-obs">Observaciones</label>
       <textarea id="p-obs" class="in" rows="2"></textarea>
     </div>
+    ${aprobHTML(filas.length>0)}
     ${filas.length?`<div class="screen-only"><div class="muted noprint" style="margin:6px 0">Detalle por puerta:</div><table class="d"><thead><tr><th>Residuo</th>${porPuerta.map(p=>`<th>${esc(p)}<br>(kg)</th>`).join("")}<th>Total<br>(kg)</th><th>UN</th></tr></thead><tbody>${body}</tbody>
       <tfoot><tr><td>TOTAL</td>${tp.map(v=>`<td class="num">${fmt(v)}</td>`).join("")}<td class="num">${fmt(gt)}</td><td></td></tr></tfoot></table></div>`
       :`<div class="card muted">No hay pesadas para esa fecha y placa.</div>`}
     ${filas.length?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button></div>`:""}
     ${officialHTML(fecha,placa,filas,tipoRes)}`;
-  // los datos del despacho se conservan al volver a consultar y se copian a la hoja impresa
-  const map={op:"p-op",cond:"p-cond",brev:"p-brev",hora:"p-hora",man:"p-man",obs:"p-obs"};
+  // los datos del despacho se copian a la hoja impresa y se envían al Google Sheet
+  const map={op:"p-op",cond:"p-cond",brev:"p-brev",hora:"p-hora",man:"p-man",manP:"p-manp",obs:"p-obs"};
+  const bloq=DSTATE&&DSTATE.estado==="Aprobado";
+  const phMan=()=>{ $("#ph-man").textContent=manTxt(); };
   Object.keys(map).forEach(k=>{
     const inp=$("#"+map[k]); if(!inp) return;
-    inp.value=DESP[k]||"";
+    inp.value=DESP[k]||""; inp.disabled=!!bloq;
     const out=$("#ph-"+k); if(out) out.textContent=DESP[k]||"";
-    inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; });
+    inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; phMan(); despChanged(); });
   });
+  phMan();
 }
-const DESP={op:"",cond:"",brev:"",hora:"",man:"",obs:""};
+const MANEJOS=[["COM-DIS","Comercialización - Disposición final"],["COM","Comercialización"],["DIS","Disposición final"],["DON","Donación (Aniquem)"],["VAL","Valorización"],["TRA","Tratamiento"],["VAL-DIS","Valorización - Disposición final"],["TRA-VAL-DIS","Tratamiento - Valorización - Disp. final"]];
+const MLBL=Object.fromEntries(MANEJOS);
+const DESP={op:"",cond:"",brev:"",hora:"",man:"",manP:"",obs:""};
+let DKEY="", DSTATE=null, DSRV=null, HP=false, HN=false, DHOJAS=[], DFILAS=[];
+function manTxt(){
+  const a=MLBL[DESP.man]||"", b=MLBL[DESP.manP]||"";
+  if(HP&&HN) return a&&b?`${a} (no peligrosos) / ${b} (peligrosos)`:(a||b);
+  return HP?b:a;
+}
+function despPayload(){
+  const [fecha,placa]=DKEY.split("|");
+  return {key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,empresa:DESP.op,conductor:DESP.cond,brevete:DESP.brev,hora:DESP.hora,manejoNP:DESP.man,manejoP:DESP.manP,obs:DESP.obs};
+}
+let dT;
+function despChanged(){
+  if(!CFG.SCRIPT_URL||!DKEY||(DSTATE&&DSTATE.estado==="Aprobado")) return;
+  const q=LS.get(DESPQ,{}); q[DKEY]=despPayload(); LS.set(DESPQ,q); drawQueue();
+  clearTimeout(dT); dT=setTimeout(()=>sync(),1200);
+}
+// al cambiar de despacho se cargan sus datos: primero lo que está por enviar desde este equipo, si no lo del servidor
+function cargarDesp(fecha,placa,srv){
+  const k=fecha+"|"+placa;
+  const aprob=srv&&srv.estado==="Aprobado";
+  if(k!==DKEY||aprob){
+    DKEY=k; const q=LS.get(DESPQ,{})[k];
+    const s=aprob||!q ? (srv?{op:srv.empresa,cond:srv.conductor,brev:srv.brevete,hora:srv.hora,man:srv.manejoNP,manP:srv.manejoP,obs:srv.obs}:{})
+                      : {op:q.empresa,cond:q.conductor,brev:q.brevete,hora:q.hora,man:q.manejoNP,manP:q.manejoP,obs:q.obs};
+    Object.keys(DESP).forEach(x=>DESP[x]=s[x]||"");
+  }
+  DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn}:{estado:"Pendiente"};
+}
+/* aprobación: pasa el despacho al Registro Interno del Google Sheet */
+function aprobHTML(hayPesadas){
+  if(!hayPesadas) return "";
+  if(!CFG.SCRIPT_URL) return `<div class="card noprint muted">Para aprobar despachos hay que conectar la hoja de Google (config.js).</div>`;
+  const ap=DSTATE&&DSTATE.estado==="Aprobado";
+  const top=ap?`<div class="okbox">✔ Despacho aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
+              :`<div class="muted">Estado: <b>Pendiente de aprobación</b>. Al aprobar, pasa al Registro Interno y al dashboard.</div>`;
+  return `<div class="card noprint" id="apr">${top}
+    <button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>
+    <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
+      ${ap?"":`<label class="f" for="a-nom">Nombre de quien aprueba</label><input id="a-nom" class="in" autocomplete="off" value="${esc(LS.get("pesaje.aprobador",""))}">`}
+      <label class="f" for="a-clave">Clave de aprobación</label><input id="a-clave" class="in" type="password" autocomplete="off">
+      <div class="row2" style="margin-top:8px"><button class="btn sec" id="a-cancel">Cancelar</button><button class="btn" id="a-ok">${ap?"Reabrir":"Aprobar"}</button></div>
+      <div id="a-err" class="warnbox hidden"></div>
+    </div></div>`;
+}
+const ERR_APR={clave_aprobar:"La clave de aprobación no es correcta.",sin_datos_despacho:"Faltan los datos del despacho (empresa y tipo de manejo).",ya_aprobado:"Este despacho ya estaba aprobado.",sin_pesadas:"No hay pesadas para aprobar.",clave:"La clave de la hoja de Google no coincide.",aprobado:"Este despacho ya está aprobado."};
+async function aprobarDesp(){
+  const box=$("#a-box"), modo=box.dataset.modo, e=$("#a-err");
+  const err=m=>{ e.textContent=m; e.classList.remove("hidden"); };
+  e.classList.add("hidden");
+  const nombre=modo==="aprobar"?$("#a-nom").value.trim():"", clave=$("#a-clave").value;
+  if(modo==="aprobar"&&!nombre) return err("Escribe el nombre de quien aprueba.");
+  if(!clave) return err("Escribe la clave de aprobación.");
+  if(!navigator.onLine) return err("Se necesita conexión para esto.");
+  const [fecha,placa]=DKEY.split("|");
+  if(modo==="aprobar"){
+    const ab=DHOJAS.filter(h=>h.estado!=="cerrada").map(h=>h.puerta);
+    if(ab.length) return err("Hay hojas abiertas ("+ab.join(", ")+"). Ciérralas antes de aprobar.");
+    const pend=DFILAS.reduce((a,r)=>a+r.pend,0);
+    if(pend) return err("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Complétalas antes de aprobar.");
+    if(!DESP.op.trim()) return err("Falta la empresa operadora.");
+    if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
+    if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
+  }
+  const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
+  try{
+    await sync(); await sync();      // primero se sube todo lo pendiente
+    const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&dirty(h))||LS.get(DESPQ,{})[DKEY];
+    if(pendLocal) return err("Hay datos por enviar. Revisa la conexión e inténtalo de nuevo.");
+    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,claveAprobar:clave,aprobador:nombre},60000);
+    if(j&&j.ok){
+      if(modo==="aprobar") LS.set("pesaje.aprobador",nombre);
+      toast(modo==="aprobar"?"Despacho aprobado: ya está en el Registro Interno.":"Despacho reabierto.");
+      if(j.aviso) alert(j.aviso);
+      return consultarDespacho();
+    }
+    if(j&&j.error==="faltan") return err("Falta: "+(j.faltan||[]).join(", ")+".");
+    if(j&&j.error==="residuo_sin_columna") return err("Estos residuos no tienen columna en el Registro Interno: "+(j.residuos||[]).join(", ")+".");
+    err(ERR_APR[j&&j.error]||("No se pudo completar ("+((j&&j.error)||"error")+")."));
+  }catch(x){ err("Sin conexión con la hoja de Google. Inténtalo de nuevo."); }
+  finally{ const b2=$("#a-ok"); if(b2){ b2.disabled=false; b2.textContent=modo==="aprobar"?"Aprobar":"Reabrir"; } }
+}
 
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
@@ -684,6 +791,9 @@ document.addEventListener("click",e=>{
   const ed=t.closest("[data-edit]"); if(ed){ editPesada(ed.dataset.edit); return; }
   const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
   if(t.closest("#d-print")){ window.print(); return; }
+  if(t.closest("#a-open")){ $("#a-box").classList.remove("hidden"); t.closest("#a-open").classList.add("hidden"); return; }
+  if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); $("#a-clave").value=""; return; }
+  if(t.closest("#a-ok")){ aprobarDesp(); return; }
 });
 $("#n-go").addEventListener("click",startHoja);
 $("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
@@ -703,7 +813,7 @@ $("#chip-q").addEventListener("click",()=>{ toast("Enviando pendientes…"); syn
 window.addEventListener("online",()=>{ drawNet(); sync(); });
 window.addEventListener("offline",()=>{ drawNet(); ACS.forEach(a=>a.abort()); });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); } });
-setInterval(()=>{ if(navigator.onLine && HOJAS.some(dirty)) sync(); },45000);
+setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(DESPQ,{})).length)) sync(); },45000);
 
 /* ---------- arranque ---------- */
 (async function init(){
