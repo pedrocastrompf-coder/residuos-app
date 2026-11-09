@@ -92,6 +92,7 @@ ol.pl .k{flex:1}
 ol.pl .k small{display:block;color:var(--gray);font-size:12px}
 ol.pl .k.pd small{color:#9a4d00;font-weight:bold}
 .ib{min-width:42px;min-height:42px;border:1px solid var(--taupe);background:#fff;border-radius:10px;font-size:16px}
+.ib.back{padding:0 12px;font-size:13px;font-weight:bold;color:var(--brown,#623C21);white-space:nowrap}
 .ib.del.ask{background:var(--red);color:#fff;border-color:var(--red);font-size:12px;font-weight:bold}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chips button{min-height:46px;padding:0 14px;border:2px solid var(--taupe);background:#fff;border-radius:999px;font-weight:bold;color:var(--brown)}
@@ -226,7 +227,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   <div class="sheet-in">
     <div class="sh-head">
       <div class="t"><span id="sh-name"></span><small id="sh-sap"></small></div>
-      <button class="ib" id="sh-x" aria-label="Cerrar">✕</button>
+      <button class="ib back" id="sh-x" aria-label="Volver a la lista">↩ Volver a la lista</button>
     </div>
     <div class="sh-tot"><span>Total de este residuo</span><span><b id="sh-kg">0</b> kg <span class="muted" id="sh-un"></span></span></div>
     <ol class="pl" id="sh-list"></ol>
@@ -250,7 +251,6 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
           <button class="btn sec hidden" id="f-cancel">Cancelar edición</button>
           <button class="btn" id="f-add">Agregar pesada</button>
         </div>
-        <button class="btn sec" id="sh-done" style="margin-top:8px">Listo · volver a la lista</button>
       </div>
     </div>
   </div>
@@ -689,7 +689,6 @@ $("#n-go").addEventListener("click",startHoja);
 $("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
 $("#b-close").addEventListener("click",cerrarOReabrir);
 $("#q").addEventListener("input",()=>drawHoja());
-$("#sh-done").addEventListener("click",closeSheet);
 $("#sh-x").addEventListener("click",closeSheet);
 $("#f-add").addEventListener("click",addPesada);
 $("#f-cancel").addEventListener("click",()=>{ resetForm(); drawSheet(); });
