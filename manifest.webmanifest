@@ -1,0 +1,16 @@
+{
+  "name": "Pesaje de residuos sólidos – Callao 1",
+  "short_name": "Pesaje RRSS",
+  "description": "Registro de pesaje de residuos sólidos por puerta",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EFE1D4",
+  "theme_color": "#623C21",
+  "lang": "es",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

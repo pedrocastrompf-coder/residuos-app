@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#623C21">
+<title>Pesaje de residuos sólidos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<style>
+:root{
+  --brown:#623C21; --green:#6ABF4B; --orange:#EC7700;
+  --sand:#EFE1D4; --sand2:#E0C5AC; --taupe:#C39B82; --gray:#636569;
+  --ink:#2B2118; --red:#B3261E; --red-bg:#FBE9E7; --ok:#2E7D32; --line:#D9C7B6;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--sand);color:var(--ink);font:15px/1.35 Arial,Helvetica,sans-serif}
+.hidden{display:none!important}
+#app{max-width:720px;margin:0 auto;padding:0 10px calc(90px + env(safe-area-inset-bottom))}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit;color:var(--ink)}
+
+/* barra superior */
+.bar{position:sticky;top:0;z-index:20;background:var(--brown);color:#fff;margin:0 -10px;padding:9px 12px;display:flex;align-items:center;gap:8px}
+.bar h1{font-size:16px;margin:0;flex:1;line-height:1.15}
+.bar small{display:block;font-weight:normal;opacity:.8;font-size:11.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid #fff;border-radius:999px;padding:3px 10px;background:transparent;color:#fff;font-size:12px;font-weight:bold}
+.chip i{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block}
+.chip.off i{background:#ff8a80}
+.chip.q{background:var(--orange);border-color:var(--orange)}
+.tabs{display:flex;gap:6px;margin:10px 0}
+.tab{flex:1;padding:11px 6px;border:2px solid var(--brown);background:#fff;color:var(--brown);border-radius:12px;font-weight:bold}
+.tab.on{background:var(--brown);color:#fff}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.card h2{margin:0 0 8px;font-size:16px;color:var(--brown)}
+label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:var(--brown)}
+.in{width:100%;border:2px solid var(--taupe);border-radius:10px;padding:11px 12px;background:#fff;min-height:48px}
+.in:focus{outline:0;border-color:var(--green)}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{flex:1;min-width:84px;min-height:52px;border:2px solid var(--taupe);background:#fff;border-radius:12px;font-weight:bold;color:var(--brown)}
+.seg button.on{background:var(--green);border-color:var(--green);color:#fff}
+.btn{min-height:50px;border:0;border-radius:12px;padding:0 16px;font-weight:bold;background:var(--green);color:#fff;width:100%}
+.btn.sec{background:#fff;color:var(--brown);border:2px solid var(--brown)}
+.btn.warn{background:var(--orange)}
+.btn.sm{min-height:40px;width:auto;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.5}
+.err{color:var(--red);font-size:13px;margin-top:4px;font-weight:bold}
+.muted{color:var(--gray);font-size:12.5px}
+
+/* lista de hojas recientes */
+.hrow{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;margin:6px 0;background:#fff;width:100%;text-align:left}
+.hrow b{color:var(--brown)}
+.badge{font-size:11.5px;font-weight:bold;border-radius:999px;padding:2px 8px;background:var(--sand2);color:var(--brown);white-space:nowrap}
+.badge.ok{background:#DDEFD5;color:var(--ok)} .badge.q{background:#FFE3C2;color:#9a4d00}
+
+/* hoja */
+.hhead{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0}
+.hhead .l1{font-weight:bold;color:var(--brown);font-size:16px}
+.hhead .tot{font-size:24px;font-weight:bold;color:var(--brown)}
+.warnbox{background:#FFF1E0;border:1px solid var(--orange);color:#7a3d00;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px;font-weight:bold}
+.search{margin:8px 0}
+.cat{margin:12px 0 4px;font-weight:bold;color:#fff;background:var(--taupe);border-radius:10px 10px 0 0;padding:7px 12px;display:flex;justify-content:space-between}
+.cat.pel{background:var(--red)}
+.cat.rec{background:var(--green);color:#fff}
+.rrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-top:0;padding:11px 12px;min-height:56px}
+.rrow:last-child{border-radius:0 0 10px 10px}
+.rrow .n{flex:1}
+.rrow .n small{display:block;color:var(--gray);font-size:11.5px}
+.rrow .v{text-align:right;min-width:78px}
+.rrow .v b{font-size:17px;color:var(--brown)}
+.rrow .v small{display:block;color:var(--gray);font-size:11.5px}
+.rrow.has{background:#F3FAEF;border-left:5px solid var(--green)}
+.rrow.pend{background:#FFF4E5;border-left:5px solid var(--orange)}
+.dock{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:2px solid var(--brown);padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:15}
+.dock .btn{flex:1}
+
+/* hoja inferior de pesadas */
+.sheet{position:fixed;inset:0;z-index:40;background:rgba(43,33,24,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--sand);width:100%;max-width:720px;max-height:94vh;overflow:auto;border-radius:18px 18px 0 0;padding:12px 12px calc(14px + env(safe-area-inset-bottom))}
+.sh-head{display:flex;gap:10px;align-items:flex-start}
+.sh-head .t{flex:1;font-weight:bold;color:var(--brown);font-size:17px}
+.sh-head .t small{display:block;color:var(--gray);font-size:12px;font-weight:normal}
+.sh-tot{background:#fff;border-radius:12px;padding:8px 12px;margin:8px 0;display:flex;justify-content:space-between;align-items:baseline}
+.sh-tot b{font-size:26px;color:var(--brown)}
+ol.pl{list-style:none;margin:0;padding:0}
+ol.pl li{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:5px 0}
+ol.pl li.ed{border-color:var(--orange);background:#FFF4E5}
+ol.pl .k{flex:1}
+ol.pl .k small{display:block;color:var(--gray);font-size:12px}
+ol.pl .k.pd small{color:#9a4d00;font-weight:bold}
+.ib{min-width:42px;min-height:42px;border:1px solid var(--taupe);background:#fff;border-radius:10px;font-size:16px}
+.ib.del.ask{background:var(--red);color:#fff;border-color:var(--red);font-size:12px;font-weight:bold}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{min-height:46px;padding:0 14px;border:2px solid var(--taupe);background:#fff;border-radius:999px;font-weight:bold;color:var(--brown)}
+.chips button.on{background:var(--brown);border-color:var(--brown);color:#fff}
+.chips button.pend.on{background:var(--orange);border-color:var(--orange)}
+.stick{position:sticky;bottom:-14px;background:#fff;padding:10px 0 4px;margin-top:6px}
+.big{font-size:26px;font-weight:bold;text-align:center;min-height:58px}
+.row2{display:flex;gap:8px}
+.row2>*{flex:1}
+.prev{margin:8px 0;padding:8px 12px;border-radius:10px;background:#fff;border:1px dashed var(--taupe);text-align:center;font-size:17px;color:var(--brown);font-weight:bold;min-height:42px}
+.prev.bad{color:var(--red);border-color:var(--red)}
+
+/* despacho */
+table.d{width:100%;border-collapse:collapse;background:#fff;font-size:13.5px}
+table.d th,table.d td{border:1px solid var(--line);padding:6px 6px}
+table.d th{background:var(--sand2);color:var(--brown);text-align:center}
+table.d td.num{text-align:right;white-space:nowrap}
+table.d tr.catr td{background:var(--taupe);color:#fff;font-weight:bold}
+table.d tr.catr.pel td{background:var(--red)}
+table.d tfoot td{font-weight:bold;background:var(--sand)}
+.st{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.st span{padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:bold;background:#fff;border:1px solid var(--line)}
+.st .ok{background:#DDEFD5;color:var(--ok);border-color:#b7dba8}
+.st .ab{background:#FFE3C2;color:#9a4d00;border-color:#f3c288}
+.st .no{background:var(--red-bg);color:var(--red);border-color:#f0b8b2}
+#print-head{display:none}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s;max-width:92vw;text-align:center}
+.toast.on{opacity:1}
+
+.off{display:none}
+@media print{
+  @page{size:A4 portrait;margin:8mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff;color:#000;font-size:8pt}
+  .bar,.tabs,.dock,.noprint,#v-home,#v-hoja,.toast,.screen-only{display:none!important}
+  #app{max-width:none;padding:0}
+  #v-desp{display:block!important}
+  .off{display:block}
+  .off table{border-collapse:collapse;width:100%}
+  .off td,.off th{border:1px solid #000;padding:2px 4px;font-size:7.5pt;line-height:1.25;color:#000}
+  .off th{background:#fff;font-weight:bold;text-align:center}
+  .off .c{text-align:center;width:19%}
+  .off .r{text-align:right}
+  .off .ohead .tit{text-align:center;font-weight:bold;font-size:10.5pt}
+  .off .og{margin-top:6px}
+  .off .og td{border:0;padding:3px 2px;font-size:8pt;width:33%}
+  .off .osec{font-weight:bold;font-size:8pt;margin:8px 0 3px}
+  .off .ocols{display:flex;gap:8px;align-items:flex-start}
+  .off .ocols>div{flex:1}
+  .off .oh th{background:#fff}
+  .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
+  .off .osign{margin-top:10px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bar">
+    <h1>Pesaje de residuos sólidos<small id="sub"></small></h1>
+    <button class="chip q hidden" id="chip-q"></button>
+    <span class="chip" id="chip-net"><i></i><span>Con conexión</span></span>
+  </div>
+
+  <div class="tabs noprint">
+    <button class="tab on" data-tab="hoja">Pesaje</button>
+    <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
+  </div>
+
+  <!-- INICIO: nueva hoja y hojas recientes -->
+  <section id="v-home">
+    <div class="card">
+      <h2>Nueva hoja de pesaje</h2>
+      <label class="f">Puerta</label>
+      <div class="seg" id="n-puerta"></div>
+      <label class="f" for="n-fecha">Fecha</label>
+      <input id="n-fecha" type="date" class="in">
+      <label class="f" for="n-placa">Placa del vehículo de despacho</label>
+      <input id="n-placa" class="in" list="dl-placas" autocapitalize="characters" autocomplete="off" placeholder="Ej.: ABZ-937">
+      <datalist id="dl-placas"></datalist>
+      <label class="f" for="n-resp">Responsable del registro</label>
+      <input id="n-resp" class="in" autocomplete="off" placeholder="Nombre y apellido">
+      <div class="err" id="n-err"></div>
+      <div style="height:10px"></div>
+      <button class="btn" id="n-go">Empezar a pesar</button>
+    </div>
+    <div class="card">
+      <h2>Hojas en este equipo</h2>
+      <div id="h-list"></div>
+    </div>
+  </section>
+
+  <!-- HOJA ABIERTA -->
+  <section id="v-hoja" class="hidden">
+    <div class="hhead">
+      <div class="l1" id="hh-l1"></div>
+      <div class="muted" id="hh-l2"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px">
+        <div><div class="muted">Total neto de la hoja</div><div class="tot"><span id="hh-kg">0</span> kg</div></div>
+        <div class="muted" id="hh-un" style="text-align:right"></div>
+      </div>
+      <div class="warnbox hidden" id="hh-warn"></div>
+    </div>
+    <input id="q" class="in search" placeholder="Buscar residuo (ej.: cartón, chocolate)…" autocomplete="off">
+    <div id="lista"></div>
+  </section>
+
+  <!-- DESPACHO -->
+  <section id="v-desp" class="hidden">
+    <div class="card noprint">
+      <h2>Consolidado por despacho</h2>
+      <div class="muted">Suma automática de las hojas de todas las puertas con la misma fecha y placa. Reemplaza el segundo registro manual.</div>
+      <div class="row2">
+        <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
+        <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas" autocapitalize="characters" autocomplete="off"></div>
+      </div>
+      <div style="height:10px"></div>
+      <button class="btn" id="d-go">Consultar</button>
+      <div class="err" id="d-err"></div>
+    </div>
+    <div id="d-out"></div>
+  </section>
+</div>
+
+<div class="dock hidden" id="dock">
+  <button class="btn sec" id="b-back">← Hojas</button>
+  <button class="btn" id="b-close">Cerrar hoja y enviar</button>
+</div>
+
+<!-- Pesadas de un residuo -->
+<div class="sheet hidden" id="sheet">
+  <div class="sheet-in">
+    <div class="sh-head">
+      <div class="t"><span id="sh-name"></span><small id="sh-sap"></small></div>
+      <button class="ib" id="sh-x" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="sh-tot"><span>Total de este residuo</span><span><b id="sh-kg">0</b> kg <span class="muted" id="sh-un"></span></span></div>
+    <ol class="pl" id="sh-list"></ol>
+    <div class="card" style="margin-bottom:0">
+      <h2 id="f-title">Nueva pesada</h2>
+      <label class="f" for="f-bruto">Peso bruto (kg)</label>
+      <input id="f-bruto" class="in big" inputmode="decimal" autocomplete="off" placeholder="0.0">
+      <label class="f">Tara del coche (kg)</label>
+      <div class="chips" id="f-taras"></div>
+      <div style="height:6px"></div>
+      <input id="f-otra" class="in" inputmode="decimal" autocomplete="off" placeholder="Otra tara (kg)">
+      <label class="f">Cantidad (opcional)</label>
+      <div class="row2">
+        <input id="f-uni" class="in" inputmode="numeric" autocomplete="off" placeholder="Ej.: 3">
+        <select id="f-tu" class="in"></select>
+      </div>
+      <div class="prev" id="f-prev">—</div>
+      <div class="err" id="f-err"></div>
+      <div class="stick">
+        <div class="row2">
+          <button class="btn sec hidden" id="f-cancel">Cancelar edición</button>
+          <button class="btn" id="f-add">Agregar pesada</button>
+        </div>
+        <button class="btn sec" id="sh-done" style="margin-top:8px">Listo · volver a la lista</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+"use strict";
+const CFG = Object.assign({SCRIPT_URL:"",CLAVE:"",ZONA_HORARIA:"America/Lima",PLANTA:"",PUERTAS:[],PLACAS:[],TARAS_INICIALES:[],UNIDADES:[["B","Bolsas"]],TIPOS_MANEJO:[],CATALOGO:[]}, window.APP_CONFIG||{});
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2 = n=>Math.round((n+Number.EPSILON)*100)/100;
+const fmt = n=>Number(n).toLocaleString("es-PE",{minimumFractionDigits:0,maximumFractionDigits:2});
+const num = s=>{ const v=parseFloat(String(s).trim().replace(",",".")); return isFinite(v)?v:NaN; };
+const uuid = ()=> (crypto.randomUUID?crypto.randomUUID():"id-"+Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+const normPlaca = s=>String(s||"").toUpperCase().replace(/[\s]/g,"");
+const fold = s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+
+/* ---------- fecha de Lima ---------- */
+function todayStr(){
+  const f=new Intl.DateTimeFormat("en-CA",{timeZone:CFG.ZONA_HORARIA,year:"numeric",month:"2-digit",day:"2-digit"});
+  return f.format(new Date());
+}
+const fechaCorta = s=>{ const [y,m,d]=String(s).split("-"); return `${d}/${m}/${y}`; };
+
+/* ---------- catálogo plano ---------- */
+const CAT = [];
+CFG.CATALOGO.forEach(g=>g.items.forEach(([cod,name])=>CAT.push({cat:g.cat,pel:!!g.peligroso,cod,name,key:cod?cod:"n:"+fold(name)})));
+const CATBY = new Map(CAT.map(x=>[x.key,x]));
+
+/* ---------- almacenamiento local ---------- */
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+let MEM = new Map();    // respaldo si IndexedDB no está disponible
+const DB = {
+  _db:null,
+  open(){ return this._db?Promise.resolve(this._db):new Promise((res,rej)=>{
+    if(!window.indexedDB) return rej(new Error("sin idb"));
+    const r=indexedDB.open("pesaje-residuos",1);
+    r.onupgradeneeded=()=>r.result.createObjectStore("hojas",{keyPath:"id"});
+    r.onsuccess=()=>{ this._db=r.result; res(r.result); }; r.onerror=()=>rej(r.error); }); },
+  async tx(mode,fn){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction("hojas",mode); const rq=fn(t.objectStore("hojas")); t.oncomplete=()=>res(rq&&rq.result); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error); }); },
+  async all(){ try{ return (await this.tx("readonly",s=>s.getAll()))||[]; }catch(e){ return Array.from(MEM.values()); } },
+  async put(h){ MEM.set(h.id,h); try{ await this.tx("readwrite",s=>s.put(h)); }catch(e){} },
+  async del(id){ MEM.delete(id); try{ await this.tx("readwrite",s=>s.delete(id)); }catch(e){} }
+};
+
+/* ---------- modelo ---------- */
+let HOJAS = [];      // todas las hojas locales
+let H = null;        // hoja abierta
+const netoDe = p => p.taraPend ? p.bruto : r2(p.bruto-(p.tara||0));
+function totales(h,key){
+  const o={kg:0,n:0,uni:{},pend:0};
+  (h.pesadas||[]).forEach(p=>{ if(p.key!==key) return; o.n++; o.kg=r2(o.kg+netoDe(p)); if(p.taraPend) o.pend++;
+    if(p.uni) o.uni[p.tu||"UD"]=(o.uni[p.tu||"UD"]||0)+p.uni; });
+  return o;
+}
+const uniTxt = u=>Object.keys(u).map(k=>`${fmt(u[k])} ${k}`).join(" · ");
+const kgHoja = h=>r2((h.pesadas||[]).reduce((a,p)=>a+netoDe(p),0));
+const pendHoja = h=>(h.pesadas||[]).filter(p=>p.taraPend).length;
+const dirty = h=>(h.rev||0)>(h.sync||0);
+
+async function saveHoja(h){ h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
+
+/* ---------- sincronización con Google Sheets ---------- */
+const ACS=new Set();   // envíos en curso: se cancelan si se pierde la señal
+async function fetchT(url,opt={},ms=30000){
+  const ac=new AbortController(); ACS.add(ac); const t=setTimeout(()=>ac.abort(),ms);
+  try{ return await fetch(url,Object.assign({signal:ac.signal},opt)); } finally{ clearTimeout(t); ACS.delete(ac); }
+}
+function payloadDe(h){
+  return { key:CFG.CLAVE, action:"hoja", id:h.id, planta:CFG.PLANTA, puerta:h.puerta, fecha:h.fecha, placa:h.placa, responsable:h.responsable, estado:h.estado,
+    pesadas:(h.pesadas||[]).map((p,i)=>({n:i+1,cod:p.cod,res:p.res,cat:p.cat,bruto:p.bruto,tara:p.taraPend?"":(p.tara||0),taraPend:!!p.taraPend,neto:netoDe(p),uni:p.uni||"",tu:p.uni?(p.tu||"UD"):"",ts:p.ts})) };
+}
+let syncing=null, lastErr="";
+async function syncRun(){
+  if(!CFG.SCRIPT_URL || !navigator.onLine) return;
+  for(const h of HOJAS.filter(dirty).sort((a,b)=>(a.act||0)-(b.act||0))){
+    const sent=h.rev; let j;
+    try{
+      const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payloadDe(h))},60000);
+      j=await r.json();
+    }catch(e){ break; }                      // sin señal: se reintenta luego
+    if(j&&j.ok){ lastErr=""; h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
+    else { lastErr=(j&&j.error)||"error"; break; }
+  }
+}
+function sync(){
+  if(syncing) return syncing;
+  syncing=syncRun().catch(()=>{}).then(()=>{ syncing=null; drawQueue(); drawHojas(); if(lastErr==="clave") toast("La clave no coincide con la de la hoja de Google."); });
+  return syncing;
+}
+function drawQueue(){
+  const n=HOJAS.filter(dirty).length, c=$("#chip-q");
+  const show = CFG.SCRIPT_URL && n;
+  c.classList.toggle("hidden",!show);
+  c.textContent = show?`⏳ ${n} por enviar`:"";
+}
+function drawNet(){ const c=$("#chip-net"); const on=navigator.onLine; c.classList.toggle("off",!on); $("span",c).textContent=on?"Con conexión":"Sin conexión"; }
+
+/* ---------- toast ---------- */
+let tT; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("on"),2600); }
+
+/* ---------- navegación ---------- */
+let TAB="hoja";
+function showView(){
+  const inHoja = TAB==="hoja" && H;
+  $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
+  $("#v-hoja").classList.toggle("hidden",!inHoja);
+  $("#v-desp").classList.toggle("hidden",TAB!=="desp");
+  $("#dock").classList.toggle("hidden",!inHoja);
+  $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
+  window.scrollTo(0,0);
+}
+
+/* ---------- inicio ---------- */
+let selPuerta=LS.get("pesaje.puerta","");
+function drawHome(){
+  $("#sub").textContent = CFG.PLANTA;
+  $("#n-puerta").innerHTML = CFG.PUERTAS.map(p=>`<button type="button" data-p="${esc(p)}" class="${p===selPuerta?"on":""}">${esc(p)}</button>`).join("");
+  $("#dl-placas").innerHTML = CFG.PLACAS.map(p=>`<option value="${esc(p)}">`).join("");
+  if(!$("#n-fecha").value) $("#n-fecha").value=todayStr();
+  $("#n-fecha").max=todayStr();
+  if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp","");
+  if(!$("#n-placa").value) $("#n-placa").value=LS.get("pesaje.placa","");
+  drawHojas();
+}
+function drawHojas(){
+  const L=HOJAS.slice().sort((a,b)=>(b.creado||0)-(a.creado||0)).slice(0,15);
+  $("#h-list").innerHTML = L.length ? L.map(h=>`
+    <button class="hrow" data-open="${h.id}">
+      <div style="flex:1"><b>${esc(h.puerta)}</b> · ${fechaCorta(h.fecha)} · ${esc(h.placa)}<div class="muted">${esc(h.responsable)} · ${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesadas</div></div>
+      ${dirty(h)&&CFG.SCRIPT_URL?'<span class="badge q">por enviar</span>':''}
+      <span class="badge ${h.estado==="cerrada"?"ok":""}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>
+    </button>`).join("") : `<div class="muted">Aún no hay hojas en este equipo.</div>`;
+  drawQueue();
+}
+async function startHoja(){
+  const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=$("#n-resp").value.trim().replace(/\s+/g," ");
+  const e=$("#n-err"); e.textContent="";
+  if(!puerta) return void(e.textContent="Elige la puerta.");
+  if(!fecha) return void(e.textContent="Elige la fecha.");
+  if(fecha>todayStr()) return void(e.textContent="La fecha no puede ser futura.");
+  if(placa.length<5) return void(e.textContent="Escribe la placa del vehículo.");
+  if(resp.split(" ").length<2) return void(e.textContent="Escribe nombre y apellido del responsable.");
+  LS.set("pesaje.puerta",puerta); LS.set("pesaje.resp",resp); LS.set("pesaje.placa",placa);
+  const ex=HOJAS.find(h=>h.puerta===puerta&&h.fecha===fecha&&h.placa===placa);
+  if(ex){ toast("Ya existía esa hoja: se abrió para continuar."); return openHoja(ex.id); }
+  const h={id:uuid(),puerta,fecha,placa,responsable:resp,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
+  HOJAS.push(h); await saveHoja(h); openHoja(h.id);
+}
+function openHoja(id){
+  H=HOJAS.find(h=>h.id===id); if(!H) return;
+  TAB="hoja"; $("#q").value=""; drawHoja(); showView();
+}
+
+/* ---------- hoja ---------- */
+function drawHoja(){
+  const ro = H.estado==="cerrada";
+  $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`;
+  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ro?" · hoja cerrada":""}`;
+  $("#hh-kg").textContent=fmt(kgHoja(H));
+  const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
+  $("#hh-un").textContent=uniTxt(u);
+  const pend=pendHoja(H), w=$("#hh-warn");
+  w.classList.toggle("hidden",!pend); w.textContent=pend?`⚠ ${pend} pesada${pend>1?"s":""} con tara pendiente: el peso es bruto hasta que la completes.`:"";
+  const q=fold($("#q").value.trim());
+  const match=x=>!q || fold(x.name+" "+x.cod+" "+x.cat).includes(q);
+  const row=x=>{
+    const t=totales(H,x.key);
+    return `<button class="rrow ${t.pend?"pend":t.n?"has":""}" data-k="${esc(x.key)}">
+      <div class="n">${esc(x.name)}<small>${x.pel?"⚠ peligroso · ":""}${x.cod?"SAP "+x.cod:"sin código SAP"}</small></div>
+      <div class="v">${t.n?`<b>${fmt(t.kg)}</b> kg<small>${t.n} pesada${t.n>1?"s":""}${uniTxt(t.uni)?" · "+uniTxt(t.uni):""}</small>`:`<span class="muted">+ pesar</span>`}</div></button>`;
+  };
+  // residuos ya pesados en esta hoja: arriba, el último pesado primero
+  const last=new Map();
+  H.pesadas.forEach(p=>last.set(p.key,Math.max(last.get(p.key)||0,p.ts||0)));
+  const pinned=CAT.filter(x=>last.has(x.key)&&match(x)).sort((a,b)=>last.get(b.key)-last.get(a.key));
+  let html="";
+  if(pinned.length) html+=`<div class="cat rec"><span>Pesados en esta hoja</span><span>último primero</span></div>`+pinned.map(row).join("");
+  let lastCat="";
+  CAT.forEach(x=>{
+    if(last.has(x.key)||!match(x)) return;
+    if(x.cat!==lastCat){ html+=`<div class="cat ${x.pel?"pel":""}"><span>${esc(x.cat)}</span><span>${x.pel?"⚠":""}</span></div>`; lastCat=x.cat; }
+    html+=row(x);
+  });
+  $("#lista").innerHTML = html || `<div class="card muted">Sin coincidencias.</div>`;
+  const b=$("#b-close"); b.textContent = ro?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",ro);
+}
+
+async function cerrarOReabrir(){
+  if(H.estado==="cerrada"){ H.estado="abierta"; await saveHoja(H); drawHoja(); return toast("Hoja reabierta."); }
+  if(!H.pesadas.length) return toast("La hoja no tiene pesadas.");
+  const pend=pendHoja(H);
+  if(pend) return toast(`Completa la tara de ${pend} pesada${pend>1?"s":""} antes de cerrar.`);
+  H.estado="cerrada"; await saveHoja(H); drawHoja();
+  toast(CFG.SCRIPT_URL?(navigator.onLine?"Hoja cerrada. Enviando…":"Hoja cerrada. Se enviará cuando haya señal."):"Hoja cerrada (modo local: falta conectar la hoja de Google).");
+}
+
+/* ---------- pesadas de un residuo ---------- */
+let CUR=null;            // residuo del catálogo abierto
+let EDIT=null;           // id de pesada en edición
+let TARA={t:"val",v:null};   // {t:'val',v}|{t:'none'}|{t:'pend'}
+function tarasRec(){
+  const ini=LS.get("pesaje.taras",null);
+  return (ini&&ini.length?ini:CFG.TARAS_INICIALES).filter(v=>v>0).slice(0,8);
+}
+function rememberTara(v){
+  const L=tarasRec().filter(x=>x!==v); L.unshift(v); LS.set("pesaje.taras",L.slice(0,8));
+}
+function openSheet(key){
+  CUR=CATBY.get(key); if(!CUR) return;
+  if(H.estado==="cerrada") return toast("La hoja está cerrada. Reábrela para editar.");
+  EDIT=null;
+  $("#sh-name").textContent=CUR.name; $("#sh-sap").textContent=CUR.cod?"SAP "+CUR.cod:"Sin código SAP";
+  $("#f-tu").innerHTML=CFG.UNIDADES.map(([c,n])=>`<option value="${c}">${esc(n)} (${c})</option>`).join("");
+  const last=LS.get("pesaje.lastTara",null);
+  TARA = last && last.t ? last : {t:"val",v:tarasRec()[0]??null};
+  $("#f-tu").value=LS.get("pesaje.lastTu",CFG.UNIDADES[0][0]);
+  resetForm(); drawSheet(); $("#sheet").classList.remove("hidden");
+  setTimeout(()=>$("#f-bruto").focus(),60);
+}
+function closeSheet(){ $("#sheet").classList.add("hidden"); CUR=null; EDIT=null; drawHoja(); }
+function resetForm(){
+  EDIT=null; $("#f-bruto").value=""; $("#f-uni").value=""; $("#f-otra").value=""; $("#f-err").textContent="";
+  $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent="Agregar pesada"; $("#f-cancel").classList.add("hidden");
+  drawTaras(); drawPrev();
+}
+function drawTaras(){
+  const L=tarasRec();
+  if(TARA.t==="val" && TARA.v!=null && !L.includes(TARA.v)) L.unshift(TARA.v);
+  $("#f-taras").innerHTML = L.map(v=>`<button type="button" data-tv="${v}" class="${TARA.t==="val"&&TARA.v===v?"on":""}">${fmt(v)}</button>`).join("")
+    + `<button type="button" data-tn="1" class="${TARA.t==="none"?"on":""}">Sin tara</button>`
+    + `<button type="button" data-tp="1" class="pend ${TARA.t==="pend"?"on":""}">Pendiente</button>`;
+}
+function readForm(){
+  const bruto=num($("#f-bruto").value);
+  let tara=null,taraPend=false;
+  const otra=$("#f-otra").value.trim();
+  if(otra){ tara=num(otra); }
+  else if(TARA.t==="val") tara=TARA.v;
+  else if(TARA.t==="none") tara=0;
+  else taraPend=true;
+  const uni=$("#f-uni").value.trim()?parseInt($("#f-uni").value,10):null;
+  return {bruto,tara,taraPend,uni:isFinite(uni)&&uni>0?uni:null,tu:$("#f-tu").value};
+}
+function drawPrev(){
+  const f=readForm(), el=$("#f-prev"); el.classList.remove("bad");
+  if(isNaN(f.bruto)){ el.textContent="—"; return; }
+  if(f.taraPend){ el.textContent=`${fmt(f.bruto)} kg (tara pendiente)`; return; }
+  if(f.tara==null||isNaN(f.tara)){ el.textContent="Elige o escribe la tara"; return; }
+  const n=r2(f.bruto-f.tara);
+  el.textContent=`${fmt(f.bruto)} − ${fmt(f.tara)} = ${fmt(n)} kg`;
+  if(n<=0) el.classList.add("bad");
+}
+function drawSheet(){
+  const t=totales(H,CUR.key);
+  $("#sh-kg").textContent=fmt(t.kg); $("#sh-un").textContent=uniTxt(t.uni);
+  const L=H.pesadas.map((p,i)=>({p,i})).filter(x=>x.p.key===CUR.key);
+  $("#sh-list").innerHTML = L.length ? L.map((x,j)=>{
+    const p=x.p, n=netoDe(p);
+    const calc = p.taraPend ? `${fmt(p.bruto)} kg bruto` : (p.tara? `${fmt(p.bruto)} − ${fmt(p.tara)} = ${fmt(n)} kg` : `${fmt(n)} kg (sin tara)`);
+    return `<li class="${EDIT===p.id?"ed":""}"><span class="muted">${j+1}</span>
+      <div class="k ${p.taraPend?"pd":""}"><b>${p.taraPend?fmt(p.bruto):fmt(n)} kg</b>${p.uni?` · ${p.uni} ${p.tu||"UD"}`:""}<small>${p.taraPend?"⚠ Tara pendiente · ":""}${calc}</small></div>
+      <button class="ib" data-edit="${p.id}" aria-label="Editar">✎</button>
+      <button class="ib del" data-del="${p.id}" aria-label="Borrar">🗑</button></li>`;
+  }).join("") : `<li class="muted" style="justify-content:center">Aún no hay pesadas de este residuo.</li>`;
+}
+async function addPesada(){
+  const f=readForm(), e=$("#f-err"); e.textContent="";
+  if(isNaN(f.bruto)||f.bruto<=0) return void(e.textContent="Escribe el peso bruto.");
+  if(!f.taraPend){
+    if(f.tara==null||isNaN(f.tara)||f.tara<0) return void(e.textContent="Elige la tara o marca «Sin tara» o «Pendiente».");
+    if(f.bruto-f.tara<=0) return void(e.textContent="El peso bruto debe ser mayor que la tara.");
+  }
+  const rec={key:CUR.key,cod:CUR.cod,res:CUR.name,cat:CUR.cat,bruto:r2(f.bruto),tara:f.taraPend?null:r2(f.tara),taraPend:f.taraPend,uni:f.uni,tu:f.uni?f.tu:"",ts:Date.now()};
+  if(EDIT){ const i=H.pesadas.findIndex(p=>p.id===EDIT); if(i>=0) H.pesadas[i]=Object.assign({},H.pesadas[i],rec,{ts:H.pesadas[i].ts}); }
+  else H.pesadas.push(Object.assign({id:uuid()},rec));
+  if(!f.taraPend){ if(rec.tara>0) rememberTara(rec.tara); TARA={t:rec.tara===0&&!$("#f-otra").value?"none":"val",v:rec.tara}; }
+  else { const l=LS.get("pesaje.lastTara",null); TARA = l&&l.t==="val" ? l : {t:"val",v:tarasRec()[0]??null}; }   // tras una pendiente, vuelve a la última tara real
+  if(TARA.t==="val"&&TARA.v!=null) LS.set("pesaje.lastTara",TARA); LS.set("pesaje.lastTu",f.tu);
+  const edited=!!EDIT;
+  await saveHoja(H);
+  resetForm(); drawSheet(); $("#f-bruto").focus(); toast(edited?"Pesada actualizada":"Pesada guardada");
+}
+function editPesada(id){
+  const p=H.pesadas.find(x=>x.id===id); if(!p) return;
+  EDIT=id; $("#f-bruto").value=p.bruto; $("#f-uni").value=p.uni||""; $("#f-otra").value="";
+  if(p.taraPend) TARA={t:"pend"}; else if(!p.tara) TARA={t:"none"}; else TARA={t:"val",v:p.tara};
+  if(p.tu) $("#f-tu").value=p.tu;
+  $("#f-title").textContent="Corregir pesada"; $("#f-add").textContent="Guardar cambio"; $("#f-cancel").classList.remove("hidden");
+  drawTaras(); drawPrev(); drawSheet(); $("#f-bruto").focus();
+}
+let delAsk=null;
+async function delPesada(id,btn){
+  if(delAsk!==id){ delAsk=id; btn.classList.add("ask"); btn.textContent="¿Borrar?"; setTimeout(()=>{ if(delAsk===id){ delAsk=null; if(btn.isConnected){ btn.classList.remove("ask"); btn.textContent="🗑"; } } },3000); return; }
+  delAsk=null; H.pesadas=H.pesadas.filter(p=>p.id!==id); if(EDIT===id) resetForm();
+  await saveHoja(H); drawSheet(); toast("Pesada borrada");
+}
+
+/* ---------- despacho consolidado ---------- */
+function buildDespacho(hojas){
+  const porPuerta=CFG.PUERTAS.slice(), map=new Map();
+  hojas.forEach(h=>(h.pesadas||[]).forEach(p=>{
+    const k=p.cod?p.cod:"n:"+fold(p.res);
+    if(!map.has(k)) map.set(k,{key:k,cod:p.cod||"",res:p.res,cat:p.cat,pp:{},uni:{},pend:0});
+    const r=map.get(k), n=p.neto!=null&&p.neto!==""?Number(p.neto):netoDe(p);
+    r.pp[h.puerta]=r2((r.pp[h.puerta]||0)+n);
+    if(p.uni) r.uni[p.tu||"UD"]=(r.uni[p.tu||"UD"]||0)+Number(p.uni);
+    if(p.taraPend===true||p.taraPend==="TRUE"||p.taraPend==="true") r.pend++;
+  }));
+  const order=new Map(CAT.map((x,i)=>[x.key,i]));
+  const filas=Array.from(map.values()).sort((a,b)=>(order.has(a.key)?order.get(a.key):999)-(order.has(b.key)?order.get(b.key):999));
+  filas.forEach(r=>r.total=r2(Object.values(r.pp).reduce((a,b)=>a+b,0)));
+  return {porPuerta,filas};
+}
+async function consultarDespacho(){
+  const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), e=$("#d-err"); e.textContent="";
+  if(!fecha||placa.length<5) return void(e.textContent="Elige la fecha y escribe la placa.");
+  let hojas=[], origen="Solo hojas de este equipo";
+  if(CFG.SCRIPT_URL && navigator.onLine){
+    try{
+      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
+      const j=await r.json();
+      if(j&&j.ok){ hojas=j.hojas||[]; origen="Hojas de todas las puertas (Google Sheets)"; }
+      else e.textContent="No se pudo consultar la hoja de Google ("+((j&&j.error)||"error")+"). Se muestran solo las de este equipo.";
+    }catch(x){ e.textContent="Sin conexión con la hoja de Google. Se muestran solo las de este equipo."; }
+  }
+  // las hojas locales (más recientes) reemplazan a las del servidor con el mismo id
+  const loc=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa);
+  const ids=new Set(loc.map(h=>h.id));
+  hojas=hojas.filter(h=>!ids.has(h.id)).concat(loc);
+  drawDespacho(fecha,placa,hojas,origen);
+}
+/* hoja impresa con el diseño del SGA.R.G.001 (Vs 05) */
+function officialHTML(fecha,placa,filas,tipoRes){
+  const kg=new Map(filas.map(r=>[r.key,r.total]));
+  const F=CFG.FORMATO||{};
+  const w=x=>{ const v=kg.get(x.key); return v?fmt(v):""; };
+  const bloque=cats=>`<table class="of">`+cats.map(c=>{
+    const g=CFG.CATALOGO.find(z=>z.cat===c); if(!g) return "";
+    return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
+      g.items.map(([cod,name])=>{ const x=CATBY.get(cod?cod:"n:"+fold(name)); return `<tr><td class="c">${cod||"-"}</td><td>${esc(name)}</td><td class="r">${x?w(x):""}</td></tr>`; }).join("");
+  }).join("")+`</table>`;
+  const pel=CFG.CATALOGO.find(z=>z.peligroso), mitad=pel?Math.ceil(pel.items.length/2):0;
+  const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
+    items.map(([cod,name])=>{ const x=CATBY.get(cod?cod:"n:"+fold(name)); return `<tr><td>${esc(name)}</td><td class="r">${x?w(x):""}</td></tr>`; }).join("")+`</table>`;
+  return `<div class="off">
+    <table class="of ohead"><tr>
+      <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
+      <td rowspan="3" class="tit">CONTROL DE DESPACHO DE RESIDUOS SÓLIDOS</td>
+      <td style="width:15%"><b>Código:</b></td><td style="width:13%;text-align:center"><b>${esc(F.codigo||"SGA.R.G.001")}</b></td></tr>
+      <tr><td><b>Versión:</b></td><td style="text-align:center"><b>${esc(F.version||"05")}</b></td></tr>
+      <tr><td><b>Fecha de aprobación:</b></td><td style="text-align:center"><b>${esc(F.aprobacion||"")}</b></td></tr></table>
+    <table class="og">
+      <tr><td><b>Fecha de registro:</b> ${fechaCorta(fecha)}</td><td><b>Empresa Operadora:</b> <span id="ph-op"></span></td><td><b>Sede:</b> ${esc(CFG.PLANTA)}</td></tr>
+      <tr><td><b>Tipo de residuo:</b> ${esc(tipoRes)}</td><td><b>Conductor:</b> <span id="ph-cond"></span></td><td><b>Placa de vehículo:</b> ${esc(placa)}</td></tr>
+      <tr><td><b>Tipo de manejo:</b> <span id="ph-man"></span></td><td><b>Brevete:</b> <span id="ph-brev"></span></td><td><b>Hora de llegada:</b> <span id="ph-hora"></span></td></tr></table>
+    <div class="osec">RESIDUOS NO PELIGROSOS</div>
+    <div class="ocols"><div>${bloque(["Orgánico - producción","Orgánico - comedor","Plástico"])}</div>
+      <div>${bloque(["Madera","Papel y cartón","Metal","Otros aprovechables","No aprovechable","Especial"])}</div></div>
+    <div class="osec">RESIDUOS PELIGROSOS</div>
+    <div class="ocols"><div>${pel?colPel(pel.items.slice(0,mitad)):""}</div><div>${pel?colPel(pel.items.slice(mitad)):""}</div></div>
+    <div class="obs"><b>OBSERVACIONES:</b> <span id="ph-obs"></span></div>
+    <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
+      <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
+  </div>`;
+}
+function drawDespacho(fecha,placa,hojas,origen){
+  const {porPuerta,filas}=buildDespacho(hojas);
+  const st=porPuerta.map(p=>{ const hs=hojas.filter(h=>h.puerta===p);
+    if(!hs.length) return `<span class="no">${esc(p)}: sin hoja</span>`;
+    return hs.every(h=>h.estado==="cerrada")?`<span class="ok">${esc(p)}: cerrada</span>`:`<span class="ab">${esc(p)}: abierta</span>`; }).join("");
+  const pend=filas.reduce((a,r)=>a+r.pend,0);
+  let body="", last="";
+  filas.forEach(r=>{
+    if(r.cat!==last){ const pel=r.cat==="Peligrosos"; body+=`<tr class="catr ${pel?"pel":""}"><td colspan="${porPuerta.length+3}">${esc(r.cat)}</td></tr>`; last=r.cat; }
+    body+=`<tr><td>${r.cod?`<small>${r.cod}</small><br>`:""}${esc(r.res)}${r.pend?" ⚠":""}</td>${porPuerta.map(p=>`<td class="num">${r.pp[p]!=null?fmt(r.pp[p]):""}</td>`).join("")}<td class="num"><b>${fmt(r.total)}</b></td><td class="num">${esc(uniTxt(r.uni))}</td></tr>`;
+  });
+  const hayPel=filas.some(r=>r.cat==="Peligrosos"), hayNo=filas.some(r=>r.cat!=="Peligrosos");
+  const tipoRes = hayPel&&hayNo ? "No peligrosos y peligrosos" : hayPel ? "Peligrosos" : hayNo ? "No peligrosos" : "";
+  const tp=porPuerta.map(p=>r2(filas.reduce((a,r)=>a+(r.pp[p]||0),0)));
+  const gt=r2(tp.reduce((a,b)=>a+b,0));
+  $("#d-out").innerHTML = `
+    <div class="card noprint"><div class="muted">${esc(origen)}</div><div class="st">${st}</div>
+      ${pend?`<div class="warnbox">⚠ Hay ${pend} pesada${pend>1?"s":""} con tara pendiente: el consolidado incluye su peso bruto.</div>`:""}
+      <div class="muted" style="margin-top:8px">Datos del despacho (salen en la hoja impresa):</div>
+      <div class="row2">
+        <div><label class="f" for="p-op">Empresa operadora</label><input id="p-op" class="in" autocomplete="off"></div>
+        <div><label class="f" for="p-cond">Conductor</label><input id="p-cond" class="in" autocomplete="off"></div>
+      </div>
+      <div class="row2">
+        <div><label class="f" for="p-brev">Brevete</label><input id="p-brev" class="in" autocomplete="off"></div>
+        <div><label class="f" for="p-hora">Hora de llegada</label><input id="p-hora" class="in" type="time"></div>
+      </div>
+      <label class="f" for="p-man">Tipo de manejo</label>
+      <select id="p-man" class="in"><option value="">— elegir —</option>${(CFG.TIPOS_MANEJO||[]).map(t=>`<option>${esc(t)}</option>`).join("")}</select>
+      <label class="f" for="p-obs">Observaciones</label>
+      <textarea id="p-obs" class="in" rows="2"></textarea>
+    </div>
+    ${filas.length?`<div class="screen-only"><div class="muted noprint" style="margin:6px 0">Detalle por puerta:</div><table class="d"><thead><tr><th>Residuo</th>${porPuerta.map(p=>`<th>${esc(p)}<br>(kg)</th>`).join("")}<th>Total<br>(kg)</th><th>UN</th></tr></thead><tbody>${body}</tbody>
+      <tfoot><tr><td>TOTAL</td>${tp.map(v=>`<td class="num">${fmt(v)}</td>`).join("")}<td class="num">${fmt(gt)}</td><td></td></tr></tfoot></table></div>`
+      :`<div class="card muted">No hay pesadas para esa fecha y placa.</div>`}
+    ${filas.length?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button></div>`:""}
+    ${officialHTML(fecha,placa,filas,tipoRes)}`;
+  // los datos del despacho se conservan al volver a consultar y se copian a la hoja impresa
+  const map={op:"p-op",cond:"p-cond",brev:"p-brev",hora:"p-hora",man:"p-man",obs:"p-obs"};
+  Object.keys(map).forEach(k=>{
+    const inp=$("#"+map[k]); if(!inp) return;
+    inp.value=DESP[k]||"";
+    const out=$("#ph-"+k); if(out) out.textContent=DESP[k]||"";
+    inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; });
+  });
+}
+const DESP={op:"",cond:"",brev:"",hora:"",man:"",obs:""};
+
+/* ---------- eventos ---------- */
+document.addEventListener("click",e=>{
+  const t=e.target;
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); } showView(); return; }
+  const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
+  const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
+  const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
+  const tv=t.closest("[data-tv]"); if(tv){ TARA={t:"val",v:parseFloat(tv.dataset.tv)}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
+  if(t.closest("[data-tn]")){ TARA={t:"none"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
+  if(t.closest("[data-tp]")){ TARA={t:"pend"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
+  const ed=t.closest("[data-edit]"); if(ed){ editPesada(ed.dataset.edit); return; }
+  const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
+  if(t.closest("#d-print")){ window.print(); return; }
+});
+$("#n-go").addEventListener("click",startHoja);
+$("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
+$("#b-close").addEventListener("click",cerrarOReabrir);
+$("#q").addEventListener("input",()=>drawHoja());
+$("#sh-done").addEventListener("click",closeSheet);
+$("#sh-x").addEventListener("click",closeSheet);
+$("#f-add").addEventListener("click",addPesada);
+$("#f-cancel").addEventListener("click",()=>{ resetForm(); drawSheet(); });
+$("#f-bruto").addEventListener("input",drawPrev);
+$("#f-uni").addEventListener("input",drawPrev);
+$("#f-otra").addEventListener("input",()=>{ if($("#f-otra").value.trim()) TARA={t:"val",v:null}; drawTaras(); drawPrev(); });
+$("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
+$("#d-go").addEventListener("click",consultarDespacho);
+$("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
+$("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
+$("#chip-q").addEventListener("click",()=>{ toast("Enviando pendientes…"); sync(); });
+window.addEventListener("online",()=>{ drawNet(); sync(); });
+window.addEventListener("offline",()=>{ drawNet(); ACS.forEach(a=>a.abort()); });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); } });
+setInterval(()=>{ if(navigator.onLine && HOJAS.some(dirty)) sync(); },45000);
+
+/* ---------- arranque ---------- */
+(async function init(){
+  HOJAS = await DB.all();
+  HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
+  drawNet(); drawHome(); showView();
+  if(navigator.onLine) sync();
+  if("serviceWorker" in navigator && location.protocol!=="file:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
