@@ -228,6 +228,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   <div class="tabs noprint">
     <button class="tab on" data-tab="hoja">Pesaje</button>
     <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
+    <button class="tab hidden" data-tab="cat" id="tab-cat">Catálogo</button>
     <button class="tab hidden" data-tab="usr" id="tab-usr">Usuarios</button>
   </div>
 
@@ -304,6 +305,27 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       <div class="err" id="d-err"></div>
     </div>
     <div id="d-out"></div>
+  </section>
+
+  <!-- CATÁLOGO (Inspector y Administrador) -->
+  <section id="v-cat" class="hidden">
+    <div class="card">
+      <h2 id="c-tit">Nuevo residuo</h2>
+      <label class="f" for="c-nom">Nombre del residuo</label>
+      <input id="c-nom" class="in" autocomplete="off" placeholder="Ej.: Residuo vidrio">
+      <label class="f" for="c-cat">Categoría (NTP 900.058:2019)</label>
+      <select id="c-cat" class="in"></select>
+      <div class="row2">
+        <div><label class="f" for="c-cod">Código SAP (opcional)</label><input id="c-cod" class="in" autocomplete="off" inputmode="numeric"></div>
+        <div><label class="f" for="c-man">Manejo</label><select id="c-man" class="in"></select></div>
+      </div>
+      <label class="sinres" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="c-act" checked> Activo (aparece en la app)</label>
+      <div class="muted" id="c-nota" style="margin-top:6px"></div>
+      <div class="err" id="c-err"></div>
+      <div class="row2" style="margin-top:10px"><button class="btn sec" id="c-cancel">Cancelar</button><button class="btn" id="c-save">Guardar</button></div>
+    </div>
+    <input id="c-q" class="in search" placeholder="Buscar residuo…" autocomplete="off">
+    <div class="card"><div id="c-list" class="muted">Cargando…</div></div>
   </section>
 
   <!-- USUARIOS (solo Administrador) -->
@@ -582,12 +604,14 @@ let tT; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add
 let TAB="hoja";
 function showView(){
   if(TAB==="usr"&&!can("usuarios")) TAB="hoja";
+  if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
   const inHoja = TAB==="hoja" && H;
   if(inHoja) drawHoja();
   $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
   $("#v-hoja").classList.toggle("hidden",!inHoja);
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
   $("#v-usr").classList.toggle("hidden",TAB!=="usr");
+  $("#v-cat").classList.toggle("hidden",TAB!=="cat");
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
   window.scrollTo(0,0);
@@ -1091,11 +1115,62 @@ async function aprobarDesp(){
   finally{ const b2=$("#a-ok"); if(b2){ b2.disabled=false; b2.textContent=modo==="aprobar"?"Aprobar":"Reabrir"; } }
 }
 
+/* ---------- administración del catálogo (Inspector y Administrador) ---------- */
+let CATADM=[], CATAD_EDIT=null, CATAD_META={categorias:[],manejos:[]};
+const ERR_CAT={nombre_invalido:"Ingrese el nombre del residuo (hasta 120 caracteres).",categoria_invalida:"Elija una categoría de la lista.",codigo_invalido:"Código SAP inválido: use solo letras, números, punto o guion (máx. 20).",nombre_existe:"Ya existe un residuo con ese nombre.",manejo_invalido:"Elija el manejo.",permiso:"Su rol no permite esta acción."};
+function catFormReset(){
+  CATAD_EDIT=null; $("#c-tit").textContent="Nuevo residuo"; $("#c-nom").value=""; $("#c-nom").readOnly=false; $("#c-cod").value=""; $("#c-act").checked=true; $("#c-err").textContent="";
+  $("#c-nota").textContent=""; $("#c-cancel").classList.add("hidden"); $("#c-man").disabled=false;
+  if($("#c-cat").options.length) $("#c-cat").selectedIndex=0; if($("#c-man").options.length) $("#c-man").selectedIndex=0;
+}
+function drawCatList(){
+  const q=fold($("#c-q").value||"");
+  const L=CATADM.filter(r=>!q||fold(r.name).includes(q)||(r.cod||"").includes(q)||fold(r.cat).includes(q));
+  $("#c-list").innerHTML=L.map(r=>`<div class="urow"><div class="nm">${esc(r.name)} <span class="bdg ${r.activo?"ap":"inact"}">${r.activo?"activo":"inactivo"}</span>${r.estado!=="Listo"?` <span class="bdg ab">${esc(r.estado)}</span>`:""}</div>
+    <div class="muted">${esc(r.cat)} · SAP ${esc(r.cod||"—")} · ${esc(r.manejo||"—")}</div>
+    <div class="acts"><button class="btn sec sm2" data-cedit="${esc(r.name)}">Editar</button><button class="btn sec sm2" data-cact="${esc(r.name)}">${r.activo?"Retirar":"Reactivar"}</button></div></div>`).join("")||"Sin resultados.";
+}
+async function drawCatAdm(){
+  const L=$("#c-list");
+  if(!navigator.onLine) return void(L.textContent="Requiere conexión con el Google Sheet.");
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"catalogo_admin"},30000);
+    if(!j||!j.ok) return void(L.textContent="No se pudo cargar ("+((j&&j.error)||"error")+").");
+    CATADM=j.residuos; CATAD_META={categorias:j.categorias,manejos:j.manejos};
+    const sc=$("#c-cat").value, sm=$("#c-man").value;
+    $("#c-cat").innerHTML=j.categorias.map(c=>`<option>${esc(c)}</option>`).join(""); $("#c-man").innerHTML=j.manejos.map(c=>`<option>${esc(c)}</option>`).join("");
+    if(sc) $("#c-cat").value=sc; if(sm) $("#c-man").value=sm;
+    drawCatList();
+  }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
+}
+function catEditar(name){
+  const r=CATADM.find(x=>x.name===name); if(!r) return;
+  CATAD_EDIT=name; $("#c-tit").textContent="Editar residuo"; $("#c-nom").value=r.name; $("#c-nom").readOnly=true; $("#c-cat").value=r.cat; $("#c-cod").value=r.cod||"";
+  const m=[...$("#c-man").options].some(o=>o.value===r.manejo); if(m) $("#c-man").value=r.manejo;
+  $("#c-man").disabled=!!r.base; $("#c-act").checked=r.activo; $("#c-err").textContent="";
+  $("#c-nota").textContent="El nombre no se cambia: si ya se usó, perdería su historial. Para renombrar, cree uno nuevo y retire este."+(r.base?" El manejo de los residuos originales ya está definido en Data.":"")+" Cambiar la categoría reclasifica el residuo en Data.";
+  $("#c-cancel").classList.remove("hidden"); $("#c-nom").scrollIntoView({behavior:"smooth",block:"center"});
+}
+async function catGuardar(extra){
+  const e=$("#c-err"); e.textContent="";
+  const b=Object.assign({key:CFG.CLAVE,action:"catalogo_guardar",name:$("#c-nom").value.trim(),cat:$("#c-cat").value,cod:$("#c-cod").value.trim(),manejo:CATAD_EDIT?"":$("#c-man").value,activo:$("#c-act").checked},extra||{});
+  if(!b.name) return void(e.textContent=ERR_CAT.nombre_invalido);
+  if(!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
+  const bt=$("#c-save"); bt.disabled=true; bt.textContent="Guardando…";
+  try{
+    const j=await postJ(b,60000);
+    if(!j||!j.ok) return void(e.textContent=ERR_CAT[j&&j.error]||"No se pudo guardar ("+((j&&j.error)||"error")+").");
+    toast(j.nuevo?"Residuo agregado: ya está disponible en la app.":"Residuo actualizado."); catFormReset(); await drawCatAdm(); cargaCatalogo();
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
+  finally{ bt.disabled=false; bt.textContent="Guardar"; }
+}
+
 /* ---------- inicio de sesión, cuenta y administración de usuarios ---------- */
 function drawUser(){
   const c=$("#chip-u"); c.classList.toggle("hidden",!(AUTH&&SES));
   if(AUTH&&SES) c.textContent="👤 "+SES.nombre.split(" ")[0];
   $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
+  $("#tab-cat").classList.toggle("hidden",!can("catalogo")||!AUTH);
   const r=$("#n-resp"); if(AUTH&&SES){ r.value=SES.nombre; r.readOnly=true; } else r.readOnly=false;
 }
 function showLogin(msg){
@@ -1187,7 +1262,7 @@ async function crearUsuario(){
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
@@ -1205,6 +1280,14 @@ document.addEventListener("click",e=>{
   if(t.closest("#a-open")){ $("#a-box").classList.remove("hidden"); t.closest("#a-open").classList.add("hidden"); return; }
   if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); return; }
   if(t.closest("#a-ok")){ aprobarDesp(); return; }
+});
+$("#c-save").addEventListener("click",()=>catGuardar());
+$("#c-cancel").addEventListener("click",catFormReset);
+$("#c-q").addEventListener("input",drawCatList);
+$("#c-list").addEventListener("click",ev=>{
+  const ed=ev.target.closest("[data-cedit]"), ac=ev.target.closest("[data-cact]");
+  if(ed) catEditar(ed.dataset.cedit);
+  if(ac){ const r=CATADM.find(x=>x.name===ac.dataset.cact); if(r&&confirm((r.activo?"¿Retirar «":"¿Reactivar «")+r.name+"» de la app?"+(r.activo?"\nSe conserva su historial.":""))){ CATAD_EDIT=r.name; $("#c-nom").value=r.name; $("#c-cat").value=r.cat; $("#c-cod").value=r.cod||""; $("#c-man").value=r.manejo||$("#c-man").value; $("#c-act").checked=!r.activo; catGuardar({activo:!r.activo}); } }
 });
 $("#lg-form").addEventListener("submit",doLogin);
 $("#cta-form").addEventListener("submit",doCta);
