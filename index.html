@@ -317,6 +317,18 @@ const uniTxt = u=>Object.keys(u).map(k=>`${fmt(u[k])} ${k}`).join(" · ");
 const kgHoja = h=>r2((h.pesadas||[]).reduce((a,p)=>a+netoDe(p),0));
 const pendHoja = h=>(h.pesadas||[]).filter(p=>p.taraPend).length;
 const dirty = h=>(h.rev||0)>(h.sync||0);
+/* despachos aprobados: sus hojas quedan solo de lectura */
+const APRK="pesaje.aprob";
+const aprobada = h=>!!LS.get(APRK,{})[h.fecha+"|"+normPlaca(h.placa)];
+function marcaAprob(f,p,v){ const m=LS.get(APRK,{}), k=f+"|"+normPlaca(p); if(v) m[k]=1; else delete m[k]; LS.set(APRK,m); }
+async function refrescaAprob(h){
+  if(!CFG.SCRIPT_URL||!navigator.onLine) return;
+  try{
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(h.fecha)}&placa=${encodeURIComponent(normPlaca(h.placa))}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},15000);
+    const j=await r.json();
+    if(j&&j.ok) marcaAprob(h.fecha,h.placa,!!(j.despacho&&j.despacho.estado==="Aprobado"));
+  }catch(e){}
+}
 
 async function saveHoja(h){ h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
 
@@ -343,7 +355,7 @@ async function syncRun(){
     const sent=h.rev; let j;
     try{ j=await postJ(payloadDe(h)); }catch(e){ return; }          // sin señal: se reintenta luego
     if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
-    else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
+    else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); h.rechazado=true; await DB.put(h); marcaAprob(h.fecha,h.placa,true); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
     else { lastErr=(j&&j.error)||"error"; return; }
   }
   const q=LS.get(DESPQ,{});
@@ -378,6 +390,7 @@ let tT; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add
 let TAB="hoja";
 function showView(){
   const inHoja = TAB==="hoja" && H;
+  if(inHoja) drawHoja();
   $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
   $("#v-hoja").classList.toggle("hidden",!inHoja);
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
@@ -404,7 +417,7 @@ function drawHojas(){
     <button class="hrow" data-open="${h.id}">
       <div style="flex:1"><b>${esc(h.puerta)}</b> · ${fechaCorta(h.fecha)} · ${esc(h.placa)}<div class="muted">${esc(h.responsable)} · ${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesadas</div></div>
       ${dirty(h)&&CFG.SCRIPT_URL?'<span class="badge q">por enviar</span>':''}
-      <span class="badge ${h.estado==="cerrada"?"ok":""}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>
+      ${aprobada(h)?'<span class="badge ok">🔒 aprobada</span>':`<span class="badge ${h.estado==="cerrada"?"ok":""}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}
     </button>`).join("") : `<div class="muted">Aún no hay hojas en este equipo.</div>`;
   drawQueue();
 }
@@ -425,18 +438,21 @@ async function startHoja(){
 function openHoja(id){
   H=HOJAS.find(h=>h.id===id); if(!H) return;
   TAB="hoja"; $("#q").value=""; drawHoja(); showView();
+  refrescaAprob(H).then(()=>{ if(H&&H.id===id){ drawHoja(); drawHojas(); } });
 }
 
 /* ---------- hoja ---------- */
 function drawHoja(){
-  const ro = H.estado==="cerrada";
+  const ap = aprobada(H), ro = H.estado==="cerrada"||ap;
   $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`;
-  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ro?" · hoja cerrada":""}`;
+  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":H.estado==="cerrada"?" · hoja cerrada":""}`;
   $("#hh-kg").textContent=fmt(kgHoja(H));
   const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
   $("#hh-un").textContent=uniTxt(u);
   const pend=pendHoja(H), w=$("#hh-warn");
-  w.classList.toggle("hidden",!pend); w.textContent=pend?`⚠ ${pend} pesada${pend>1?"s":""} con tara pendiente: el peso es bruto hasta que la completes.`:"";
+  const aviso = ap ? (H.rechazado?"🔒 Despacho aprobado: ya no se puede editar. Los últimos cambios hechos en este equipo NO se guardaron en el Registro. Pide que reabran el despacho.":"🔒 Despacho aprobado: solo lectura. Para corregir, el inspector debe reabrir el despacho.")
+                   : pend?`⚠ ${pend} pesada${pend>1?"s":""} con tara pendiente: el peso es bruto hasta que la completes.`:"";
+  w.classList.toggle("hidden",!aviso); w.textContent=aviso;
   const q=fold($("#q").value.trim());
   const match=x=>!q || fold(x.name+" "+x.cod+" "+x.cat).includes(q);
   const row=x=>{
@@ -458,10 +474,11 @@ function drawHoja(){
     html+=row(x);
   });
   $("#lista").innerHTML = html || `<div class="card muted">Sin coincidencias.</div>`;
-  const b=$("#b-close"); b.textContent = ro?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",ro);
+  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap);
 }
 
 async function cerrarOReabrir(){
+  if(aprobada(H)) return toast("Despacho aprobado: ya no se puede editar.");
   if(H.estado==="cerrada"){ H.estado="abierta"; await saveHoja(H); drawHoja(); return toast("Hoja reabierta."); }
   if(!H.pesadas.length) return toast("La hoja no tiene pesadas.");
   const pend=pendHoja(H);
@@ -483,6 +500,7 @@ function rememberTara(v){
 }
 function openSheet(key){
   CUR=CATBY.get(key); if(!CUR) return;
+  if(aprobada(H)) return toast("Despacho aprobado: solo lectura. Pide que lo reabran para corregir.");
   if(H.estado==="cerrada") return toast("La hoja está cerrada. Reábrela para editar.");
   EDIT=null;
   $("#sh-name").textContent=CUR.name; $("#sh-sap").textContent=CUR.cod?"SAP "+CUR.cod:"Sin código SAP";
@@ -540,6 +558,7 @@ function drawSheet(){
   }).join("") : `<li class="muted" style="justify-content:center">Aún no hay pesadas de este residuo.</li>`;
 }
 async function addPesada(){
+  if(aprobada(H)) return toast("Despacho aprobado: ya no se puede editar.");
   const f=readForm(), e=$("#f-err"); e.textContent="";
   if(isNaN(f.bruto)||f.bruto<=0) return void(e.textContent="Escribe el peso bruto.");
   if(!f.taraPend){
@@ -557,6 +576,7 @@ async function addPesada(){
   resetForm(); drawSheet(); $("#f-bruto").focus(); toast(edited?"Pesada actualizada":"Pesada guardada");
 }
 function editPesada(id){
+  if(aprobada(H)) return toast("Despacho aprobado: ya no se puede editar.");
   const p=H.pesadas.find(x=>x.id===id); if(!p) return;
   EDIT=id; $("#f-bruto").value=p.bruto; $("#f-uni").value=p.uni||""; $("#f-otra").value="";
   if(p.taraPend) TARA={t:"pend"}; else if(!p.tara) TARA={t:"none"}; else TARA={t:"val",v:p.tara};
@@ -566,6 +586,7 @@ function editPesada(id){
 }
 let delAsk=null;
 async function delPesada(id,btn){
+  if(aprobada(H)) return toast("Despacho aprobado: ya no se puede editar.");
   if(delAsk!==id){ delAsk=id; btn.classList.add("ask"); btn.textContent="¿Borrar?"; setTimeout(()=>{ if(delAsk===id){ delAsk=null; if(btn.isConnected){ btn.classList.remove("ask"); btn.textContent="🗑"; } } },3000); return; }
   delAsk=null; H.pesadas=H.pesadas.filter(p=>p.id!==id); if(EDIT===id) resetForm();
   await saveHoja(H); drawSheet(); toast("Pesada borrada");
@@ -595,7 +616,7 @@ async function consultarDespacho(){
     try{
       const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
       const j=await r.json();
-      if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; origen="Hojas de todas las puertas (Google Sheets)"; }
+      if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; marcaAprob(fecha,placa,!!(DSRV&&DSRV.estado==="Aprobado")); origen="Hojas de todas las puertas (Google Sheets)"; }
       else e.textContent="No se pudo consultar la hoja de Google ("+((j&&j.error)||"error")+"). Se muestran solo las de este equipo.";
     }catch(x){ e.textContent="Sin conexión con la hoja de Google. Se muestran solo las de este equipo."; }
   }
