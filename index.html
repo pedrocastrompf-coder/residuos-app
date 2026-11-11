@@ -223,6 +223,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
           <label class="f" for="n-placa">Placa del vehículo de despacho</label>
           <input id="n-placa" class="in" list="dl-placas" autocapitalize="characters" autocomplete="off" placeholder="Ej.: ABZ-937">
           <datalist id="dl-placas"></datalist>
+          <datalist id="dl-placas-d"></datalist>
           <label class="f" for="n-resp">Responsable del registro</label>
           <input id="n-resp" class="in" autocomplete="off" placeholder="Nombre y apellido">
           <div class="err" id="n-err"></div>
@@ -258,7 +259,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       <div class="muted">Suma automática de las hojas de todas las puertas con la misma fecha y placa. Reemplaza el segundo registro manual.</div>
       <div class="row2">
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
-        <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas" autocapitalize="characters" autocomplete="off"></div>
+        <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
       </div>
       <div style="height:10px"></div>
       <button class="btn" id="d-go">Consultar</button>
@@ -478,6 +479,11 @@ function showView(){
 
 /* ---------- inicio ---------- */
 let selPuerta=LS.get("pesaje.puerta","");
+function dlDesp(){
+  const f=$("#d-fecha").value, con=[...new Set((HOJAS||[]).filter(h=>h.fecha===f).map(h=>h.placa))];
+  const resto=CFG.PLACAS.filter(p=>!con.includes(p));
+  $("#dl-placas-d").innerHTML = con.map(p=>`<option value="${esc(p)}" label="${esc(p)} · con pesadas ese día">`).join("")+resto.map(p=>`<option value="${esc(p)}">`).join("");
+}
 function drawHome(){
   $("#sub").textContent = CFG.PLANTA;
   $("#n-puerta").innerHTML = CFG.PUERTAS.map(p=>`<button type="button" data-p="${esc(p)}" class="${p===selPuerta?"on":""}">${esc(p)}</button>`).join("");
@@ -926,7 +932,7 @@ async function aprobarDesp(){
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); } showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); dlDesp(); } showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp",""); drawHome(); openNew(true); startHoja(); return; }
@@ -958,6 +964,7 @@ $("#f-otra").addEventListener("input",()=>{ if($("#f-otra").value.trim()) TARA={
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
 $("#d-go").addEventListener("click",consultarDespacho);
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
+$("#d-fecha").addEventListener("change",dlDesp);
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Enviando pendientes…"); sync(); });
 window.addEventListener("online",()=>{ drawNet(); sync(); cargaCatalogo(); });
