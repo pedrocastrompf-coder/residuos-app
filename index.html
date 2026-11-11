@@ -112,6 +112,12 @@ button.pch{border:1px dashed #9a8a7a;background:#fff;cursor:pointer}
 .bt .kgb{align-self:flex-start;background:rgba(255,255,255,.88);color:#333;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:bold}
 .bw.open .bt{border-radius:12px 12px 0 0}
 .bt.esp{border:2px dashed #8a8178;background:#fff!important;color:#333!important}
+.vehya{margin-top:10px;padding:9px 10px;border-radius:10px;background:#EEF6EA;color:#2A6B30;font-size:13px}
+.crow{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-top:0;padding:10px 12px}
+.crow .n small{display:block;color:var(--gray);font-size:11.5px;margin-top:2px}
+.crow .acts{display:flex;gap:8px}
+.crow.off2{opacity:.6}
+.bw .crow:last-child{border-radius:0 0 10px 10px}
 .bsub{font-size:12px;font-weight:bold;color:var(--gray);margin:8px 2px 3px;text-transform:uppercase}
 .bw .rrow:last-child{border-radius:0 0 10px 10px}
 .bempty{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;padding:12px;color:var(--gray);font-size:13px}
@@ -262,6 +268,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
               <div><label class="f" for="n-hora">Hora de llegada</label><input id="n-hora" class="in" type="time"></div>
             </div>
           </div>
+          <div class="vehya hidden" id="n-vehya"></div>
           <div class="err" id="n-err"></div>
           <div style="height:10px"></div>
           <button class="btn" id="n-go">Iniciar pesaje</button>
@@ -636,7 +643,23 @@ function drawHome(){
   if(!$("#n-placa").value) $("#n-placa").value=LS.get("pesaje.placa","");
   drawHojas();
 }
-function openNew(v){ $("#n-card").classList.toggle("open",v===undefined?!$("#n-card").classList.contains("open"):!!v); }
+function openNew(v){ $("#n-card").classList.toggle("open",v===undefined?!$("#n-card").classList.contains("open"):!!v); if($("#n-card").classList.contains("open")) syncVeh(); }
+// los datos del vehículo se piden de entrada; solo se ocultan si el viaje vigente de esa placa y fecha ya los tiene
+function syncVeh(){
+  const fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), box=$("#n-veh");
+  let ya=false, dv=null, vv=1;
+  if(fecha&&placa.length>=5){
+    vv=Math.max(1,...HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje)));
+    dv=vehDe(dkey(fecha,placa,vv)); ya=!!dv&&!aprobada({fecha,placa,viaje:vv});
+  }
+  box.classList.toggle("hidden",ya);
+  const my=$("#n-vehya"); my.classList.toggle("hidden",!ya);
+  if(ya) my.textContent="✓ Datos del vehículo ya registrados para este viaje ("+dv.empresa+" · "+dv.conductor+(dv.brevete?" · "+dv.brevete:"")+"). No se piden de nuevo.";
+  if(!ya){
+    if(!$("#n-hora").value) $("#n-hora").value=horaAhora();
+    const ult=placa?LS.get("pesaje.vehult",{})[placa]:null; if(ult&&!$("#n-emp").value) $("#n-emp").value=ult.empresa||"";
+  }
+}
 function drawHojas(){
   const hoy=todayStr(), G=new Map();
   HOJAS.forEach(h=>{ const pl=normPlaca(h.placa), k=h.fecha+"|"+pl+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{fecha:h.fecha,placa:pl,viaje:vj(h.viaje),hojas:[],ts:0}); const g=G.get(k); g.hojas.push(h); g.ts=Math.max(g.ts,h.creado||0); });
@@ -730,7 +753,7 @@ async function startHoja(viajeFijo){
   }
   const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,usuario:AUTH&&SES?SES.usuario:"",estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
   if(v>1) toast("Viaje "+v+" iniciado.");
-  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); $("#n-veh").classList.add("hidden"); openNew(false); openHoja(h.id);
+  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); ["#n-emp"].forEach(i=>$(i).value=""); openNew(false); openHoja(h.id);
   sync();
 }
 function openHoja(id){
@@ -1123,12 +1146,26 @@ function catFormReset(){
   $("#c-nota").textContent=""; $("#c-cancel").classList.add("hidden"); $("#c-man").disabled=false;
   if($("#c-cat").options.length) $("#c-cat").selectedIndex=0; if($("#c-man").options.length) $("#c-man").selectedIndex=0;
 }
+let OPENCB=null;
+// misma organización que la lista de la hoja de pesaje: un bloque por color NTP, con sus categorías y residuos
 function drawCatList(){
   const q=fold($("#c-q").value||"");
   const L=CATADM.filter(r=>!q||fold(r.name).includes(q)||(r.cod||"").includes(q)||fold(r.cat).includes(q));
-  $("#c-list").innerHTML=L.map(r=>`<div class="urow"><div class="nm">${esc(r.name)} <span class="bdg ${r.activo?"ap":"inact"}">${r.activo?"activo":"inactivo"}</span>${r.estado!=="Listo"?` <span class="bdg ab">${esc(r.estado)}</span>`:""}</div>
-    <div class="muted">${esc(r.cat)} · SAP ${esc(r.cod||"—")} · ${esc(r.manejo||"—")}</div>
-    <div class="acts"><button class="btn sec sm2" data-cedit="${esc(r.name)}">Editar</button><button class="btn sec sm2" data-cact="${esc(r.name)}">${r.activo?"Retirar":"Reactivar"}</button></div></div>`).join("")||"Sin resultados.";
+  const fila=r=>`<div class="crow ${r.activo?"":"off2"}"><div class="n"><b>${esc(r.name)}</b> <span class="bdg ${r.activo?"ap":"inact"}">${r.activo?"activo":"inactivo"}</span>${r.estado!=="Listo"?` <span class="bdg ab">${esc(r.estado)}</span>`:""}
+    <small>${r.cod?"SAP "+esc(r.cod):"sin código SAP"} · ${esc(r.manejo||"—")}</small></div>
+    <div class="acts"><button class="btn sec sm2" data-cedit="${esc(r.name)}">Editar</button><button class="btn sec sm2" data-cact="${esc(r.name)}">${r.activo?"Retirar":"Reactivar"}</button></div></div>`;
+  const bl=BLOQUES.map(b=>({b,items:L.filter(r=>b.cats.includes(r.cat)),todos:CATADM.filter(r=>b.cats.includes(r.cat))}));
+  const html=`<div class="blk">`+bl.filter(o=>!q||o.items.length).map(o=>{
+    const b=o.b, abre=q?true:OPENCB===b.id, st=`background:${b.bg};color:${b.fg};${b.bd?"border-color:"+b.bd+";":""}`;
+    let cuerpo="";
+    if(abre){
+      if(!o.items.length) cuerpo=`<div class="bempty">Sin residuos en este tipo.</div>`;
+      else if(b.cats.length>1) cuerpo=b.cats.map(c=>{ const it=o.items.filter(x=>x.cat===c); return it.length?`<div class="bsub">${esc(c)}</div>`+it.map(fila).join(""):""; }).join("");
+      else cuerpo=o.items.map(fila).join("");
+    }
+    return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-cb="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small></button>${cuerpo}</div>`;
+  }).join("")+`</div>`;
+  $("#c-list").innerHTML=L.length?html:"Sin resultados.";
 }
 async function drawCatAdm(){
   const L=$("#c-list");
@@ -1269,6 +1306,7 @@ document.addEventListener("click",e=>{
   const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho(); return; }
   const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
+  const cb=t.closest("[data-cb]"); if(cb){ OPENCB=OPENCB===cb.dataset.cb?null:cb.dataset.cb; drawCatList(); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
   const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
   const tv=t.closest("[data-tv]"); if(tv){ TARA={t:"val",v:parseFloat(tv.dataset.tv)}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
@@ -1314,8 +1352,8 @@ $("#f-uni").addEventListener("input",drawPrev);
 $("#f-otra").addEventListener("input",()=>{ if($("#f-otra").value.trim()) TARA={t:"val",v:null}; drawTaras(); drawPrev(); });
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
 $("#d-go").addEventListener("click",consultarDespacho);
-$("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); $("#n-veh").classList.add("hidden"); viajeOk=null; });
-$("#n-fecha").addEventListener("change",()=>$("#n-veh").classList.add("hidden"));
+$("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); viajeOk=null; syncVeh(); });
+$("#n-fecha").addEventListener("change",syncVeh);
 $("#d-fecha").addEventListener("change",dlDesp);
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Sincronizando…"); sync(); });
