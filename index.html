@@ -53,6 +53,10 @@ label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:va
 /* lista de hojas recientes */
 .hrow{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;margin:6px 0;background:#fff;width:100%;text-align:left}
 .hrow b{color:var(--brown)}
+.xh{border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:bold;color:#9a3412;background:#fff7ed}
+.sinres{margin-top:8px;background:#FFF1E0;border:1px solid var(--orange);border-radius:10px;padding:8px 10px;font-size:13px}
+.sinres label{display:flex;gap:8px;align-items:flex-start;font-weight:bold;color:#7a3d00}
+.sinres input{width:22px;height:22px;flex:none}
 .badge{font-size:11.5px;font-weight:bold;border-radius:999px;padding:2px 8px;background:var(--sand2);color:var(--brown);white-space:nowrap}
 .badge.ok{background:#DDEFD5;color:var(--ok)} .badge.q{background:#FFE3C2;color:#9a4d00}
 
@@ -352,7 +356,8 @@ function totales(h,key){
 const uniTxt = u=>Object.keys(u).map(k=>`${fmt(u[k])} ${k}`).join(" · ");
 const kgHoja = h=>r2((h.pesadas||[]).reduce((a,p)=>a+netoDe(p),0));
 const pendHoja = h=>(h.pesadas||[]).filter(p=>p.taraPend).length;
-const dirty = h=>(h.rev||0)>(h.sync||0);
+// una hoja vacía que nunca se envió no se manda al Sheet (así no queda como "abierta" bloqueando la aprobación)
+const dirty = h=>(h.rev||0)>(h.sync||0) && !((h.pesadas||[]).length===0 && !h.sync);
 /* despachos aprobados: sus hojas quedan solo de lectura */
 const APRK="pesaje.aprob";
 const aprobada = h=>!!LS.get(APRK,{})[h.fecha+"|"+normPlaca(h.placa)];
@@ -453,6 +458,7 @@ function drawHojas(){
     <button class="hrow" data-open="${h.id}">
       <div style="flex:1"><b>${esc(h.puerta)}</b> · ${fechaCorta(h.fecha)} · ${esc(h.placa)}<div class="muted">${esc(h.responsable)} · ${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesadas</div></div>
       ${dirty(h)&&CFG.SCRIPT_URL?'<span class="badge q">por enviar</span>':''}
+      ${(h.pesadas||[]).length===0&&(aprobada(h)||!h.sync)?`<span class="xh" data-delh="${h.id}">✕ quitar</span>`:""}
       ${aprobada(h)?'<span class="badge ok">🔒 aprobada</span>':`<span class="badge ${h.estado==="cerrada"?"ok":""}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}
     </button>`).join("") : `<div class="muted">Aún no hay hojas en este equipo.</div>`;
   drawQueue();
@@ -467,6 +473,10 @@ async function startHoja(){
   if(resp.split(" ").length<2) return void(e.textContent="Escribe nombre y apellido del responsable.");
   LS.set("pesaje.puerta",puerta); LS.set("pesaje.resp",resp); LS.set("pesaje.placa",placa);
   const ex=HOJAS.find(h=>h.puerta===puerta&&h.fecha===fecha&&h.placa===placa);
+  if(!ex){
+    await refrescaAprob({fecha,placa});     // consulta al servidor si hay señal
+    if(aprobada({fecha,placa})) return void(e.textContent="El despacho de "+placa+" del "+fechaCorta(fecha)+" ya fue aprobado: no se pueden crear hojas nuevas. Si falta pesar algo, pide que reabran el despacho.");
+  }
   if(ex){ toast("Ya existía esa hoja: se abrió para continuar."); return openHoja(ex.id); }
   const h={id:uuid(),puerta,fecha,placa,responsable:resp,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
   HOJAS.push(h); await saveHoja(h); openHoja(h.id);
@@ -739,7 +749,7 @@ function drawDespacho(fecha,placa,hojas,origen){
       <label class="f" for="p-obs">Observaciones</label>
       <textarea id="p-obs" class="in" rows="2"></textarea>
     </div>
-    ${aprobHTML(filas.length>0)}
+    ${aprobHTML(filas.length>0, porPuerta.filter(p=>!hojas.some(h=>h.puerta===p)))}
     ${filas.length?`<div class="screen-only"><div class="muted noprint" style="margin:6px 0">Detalle por puerta:</div><table class="d"><thead><tr><th>Residuo</th>${porPuerta.map(p=>`<th>${esc(p)}<br>(kg)</th>`).join("")}<th>Total<br>(kg)</th><th>UN</th></tr></thead><tbody>${body}</tbody>
       <tfoot><tr><td>TOTAL</td>${tp.map(v=>`<td class="num">${fmt(v)}</td>`).join("")}<td class="num">${fmt(gt)}</td><td></td></tr></tfoot></table></div>`
       :`<div class="card muted">No hay pesadas para esa fecha y placa.</div>`}
@@ -789,7 +799,9 @@ function cargarDesp(fecha,placa,srv){
   DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn}:{estado:"Pendiente"};
 }
 /* aprobación: pasa el despacho al Registro Interno del Google Sheet */
-function aprobHTML(hayPesadas){
+let FALTAN=[];
+function aprobHTML(hayPesadas,sinHoja){
+  FALTAN=sinHoja||[];
   if(!hayPesadas) return "";
   if(!CFG.SCRIPT_URL) return `<div class="card noprint muted">Para aprobar despachos hay que conectar la hoja de Google (config.js).</div>`;
   const ap=DSTATE&&DSTATE.estado==="Aprobado";
@@ -798,6 +810,7 @@ function aprobHTML(hayPesadas){
   return `<div class="card noprint" id="apr">${top}
     <button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
+      ${ap||!FALTAN.length?"":`<div class="sinres"><label><input type="checkbox" id="a-sinres"><span>Confirmo que en ${FALTAN.map(esc).join(" y ")} no hubo residuos para este camión.</span></label><div class="muted" style="margin-top:4px">Si sí hubo, no marques esto: primero crea y cierra la hoja de esa puerta.</div></div>`}
       ${ap?"":`<label class="f" for="a-nom">Nombre de quien aprueba</label><input id="a-nom" class="in" autocomplete="off" value="${esc(LS.get("pesaje.aprobador",""))}">`}
       <label class="f" for="a-clave">Clave de aprobación</label><input id="a-clave" class="in" type="password" autocomplete="off">
       <div class="row2" style="margin-top:8px"><button class="btn sec" id="a-cancel">Cancelar</button><button class="btn" id="a-ok">${ap?"Reabrir":"Aprobar"}</button></div>
@@ -819,6 +832,12 @@ async function aprobarDesp(){
     if(ab.length) return err("Hay hojas abiertas ("+ab.join(", ")+"). Ciérralas antes de aprobar.");
     const pend=DFILAS.reduce((a,r)=>a+r.pend,0);
     if(pend) return err("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Complétalas antes de aprobar.");
+    if(FALTAN.length){
+      if(!$("#a-sinres").checked) return err("Faltan hojas en: "+FALTAN.join(", ")+". Crea la hoja o marca la confirmación de que no hubo residuos.");
+      const nota="Sin residuos en: "+FALTAN.join(", ")+" (confirmado por "+nombre+").";
+      DESP.obs=(DESP.obs||"").replace(/\n?Sin residuos en: [^\n]*/g,"").trim(); DESP.obs=(DESP.obs?DESP.obs+"\n":"")+nota;
+      const po=$("#p-obs"); if(po) po.value=DESP.obs; const ho=$("#ph-obs"); if(ho) ho.textContent=DESP.obs; despChanged();
+    }
     if(!DESP.op.trim()) return err("Falta la empresa operadora.");
     if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
     if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
@@ -847,6 +866,7 @@ document.addEventListener("click",e=>{
   const t=e.target;
   const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); } showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
+  const dh=t.closest("[data-delh]"); if(dh){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Quitar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja quitada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
   const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
