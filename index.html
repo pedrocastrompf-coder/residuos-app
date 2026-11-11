@@ -65,6 +65,16 @@ label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:va
 .cat{margin:12px 0 4px;font-weight:bold;color:#fff;background:var(--taupe);border-radius:10px 10px 0 0;padding:7px 12px;display:flex;justify-content:space-between}
 .cat.pel{background:var(--red)}
 .cat.rec{background:var(--green);color:#fff}
+.blk{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.bw{min-width:0;display:flex;flex-direction:column} .bw .bt{flex:1} .bw.open{grid-column:1/-1}
+.bt{width:100%;border-radius:12px;padding:12px 11px;text-align:left;font-weight:bold;font-size:15px;min-height:66px;display:flex;flex-direction:column;justify-content:space-between;gap:4px;border:2px solid rgba(0,0,0,.12)}
+.bt small{font-weight:normal;font-size:11.5px;opacity:.92}
+.bt .kgb{align-self:flex-start;background:rgba(255,255,255,.88);color:#333;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:bold}
+.bw.open .bt{border-radius:12px 12px 0 0}
+.bt.esp{border:2px dashed #8a8178;background:#fff!important;color:#333!important}
+.bsub{font-size:12px;font-weight:bold;color:var(--gray);margin:8px 2px 3px;text-transform:uppercase}
+.bw .rrow:last-child{border-radius:0 0 10px 10px}
+.bempty{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;padding:12px;color:var(--gray);font-size:13px}
 .rrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-top:0;padding:11px 12px;min-height:56px}
 .rrow:last-child{border-radius:0 0 10px 10px}
 .rrow .n{flex:1}
@@ -280,15 +290,41 @@ function todayStr(){
 const fechaCorta = s=>{ const [y,m,d]=String(s).split("-"); return `${d}/${m}/${y}`; };
 
 /* ---------- catálogo plano ---------- */
-const CAT = [];
-CFG.CATALOGO.forEach(g=>g.items.forEach(([cod,name])=>CAT.push({cat:g.cat,pel:!!g.peligroso,cod,name,key:cod?cod:"n:"+fold(name)})));
-const CATBY = new Map(CAT.map(x=>[x.key,x]));
+let CAT = [], CATBY = new Map();
+function setCat(lista){   // lista: [{name,cat,cod}]
+  CAT = lista.map(r=>({cat:r.cat,pel:r.cat==="Peligrosos",cod:r.cod||"",name:r.name,key:r.cod?String(r.cod):"n:"+fold(r.name)}));
+  CATBY = new Map(CAT.map(x=>[x.key,x]));
+}
+const CAT_CONFIG=[]; CFG.CATALOGO.forEach(g=>g.items.forEach(([cod,name])=>CAT_CONFIG.push({cat:g.cat,cod,name})));
+const CATK="pesaje.catalogo";
+// Tipos fijos según la NTP 900.058:2019 (Tabla 2, no municipal). cats = categorías de la pestaña Catálogo
+const BLOQUES=[
+  {id:"org",t:"Orgánicos",ntp:"marrón",bg:"#7B4A2A",fg:"#fff",cats:["Orgánico - producción","Orgánico - comedor"]},
+  {id:"pap",t:"Papel y cartón",ntp:"azul",bg:"#1F5FBF",fg:"#fff",cats:["Papel y cartón"]},
+  {id:"pla",t:"Plástico",ntp:"blanco",bg:"#FFFFFF",fg:"#333",bd:"#9a9a9a",cats:["Plástico"]},
+  {id:"met",t:"Metales",ntp:"amarillo",bg:"#F2C500",fg:"#333",cats:["Metal"]},
+  {id:"vid",t:"Vidrio",ntp:"plomo",bg:"#8A8F94",fg:"#fff",cats:["Vidrio"]},
+  {id:"nap",t:"No aprovechables",ntp:"negro",bg:"#222",fg:"#fff",cats:["No aprovechable"]},
+  {id:"pel",t:"Peligrosos",ntp:"rojo",bg:"#C62828",fg:"#fff",cats:["Peligrosos"]},
+  {id:"otr",t:"Otros aprovechables",ntp:"verde",bg:"#2E8B3D",fg:"#fff",cats:["Otros aprovechables","Madera"]},
+  {id:"esp",t:"Residuos especiales",ntp:"sin color NTP",bg:"#fff",fg:"#333",esp:true,cats:["Especial"]}];
+const bloqueDe = cat=>BLOQUES.find(b=>b.cats.includes(cat))||BLOQUES[BLOQUES.length-1];
+let OPENB=null;
+async function cargaCatalogo(){
+  if(!CFG.SCRIPT_URL||!navigator.onLine) return;
+  try{
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},30000);
+    const j=await r.json();
+    if(j&&j.ok&&j.residuos&&j.residuos.length){ LS.set(CATK,j.residuos); setCat(j.residuos); if(H&&TAB==="hoja") drawHoja(); }
+  }catch(e){}
+}
 
 /* ---------- almacenamiento local ---------- */
 const LS = {
   get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
   set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
+setCat(LS.get(CATK,null)||CAT_CONFIG);
 let MEM = new Map();    // respaldo si IndexedDB no está disponible
 const DB = {
   _db:null,
@@ -467,12 +503,20 @@ function drawHoja(){
   const pinned=CAT.filter(x=>last.has(x.key)&&match(x)).sort((a,b)=>last.get(b.key)-last.get(a.key));
   let html="";
   if(pinned.length) html+=`<div class="cat rec"><span>Pesados en esta hoja</span><span>último primero</span></div>`+pinned.map(row).join("");
-  let lastCat="";
-  CAT.forEach(x=>{
-    if(last.has(x.key)||!match(x)) return;
-    if(x.cat!==lastCat){ html+=`<div class="cat ${x.pel?"pel":""}"><span>${esc(x.cat)}</span><span>${x.pel?"⚠":""}</span></div>`; lastCat=x.cat; }
-    html+=row(x);
-  });
+  const rest=CAT.filter(x=>!last.has(x.key)&&match(x));
+  const bl=BLOQUES.map(b=>({b,items:rest.filter(x=>b.cats.includes(x.cat)),todos:CAT.filter(x=>b.cats.includes(x.cat))}));
+  const kgBloque=b=>r2(CAT.filter(x=>b.cats.includes(x.cat)).reduce((a,x)=>a+totales(H,x.key).kg,0));
+  html+=`<div class="blk">`+bl.filter(o=>!q||o.items.length).map(o=>{
+    const b=o.b, abre=q?true:OPENB===b.id, kg=kgBloque(b);
+    const st=`background:${b.bg};color:${b.fg};${b.bd?"border-color:"+b.bd+";":""}`;
+    let cuerpo="";
+    if(abre){
+      if(!o.items.length) cuerpo=`<div class="bempty">Sin residuos aún. El administrador puede agregarlos en la pestaña Catálogo.</div>`;
+      else if(b.cats.length>1) cuerpo=b.cats.map(c=>{ const it=o.items.filter(x=>x.cat===c); return it.length?`<div class="bsub">${esc(c)}</div>`+it.map(row).join(""):""; }).join("");
+      else cuerpo=o.items.map(row).join("");
+    }
+    return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
+  }).join("")+`</div>`;
   $("#lista").innerHTML = html || `<div class="card muted">Sin coincidencias.</div>`;
   const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap);
 }
@@ -632,13 +676,12 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const F=CFG.FORMATO||{};
   const w=x=>{ const v=kg.get(x.key); return v?fmt(v):""; };
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
-    const g=CFG.CATALOGO.find(z=>z.cat===c); if(!g) return "";
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
-      g.items.map(([cod,name])=>{ const x=CATBY.get(cod?cod:"n:"+fold(name)); return `<tr><td class="c">${cod||"-"}</td><td>${esc(name)}</td><td class="r">${x?w(x):""}</td></tr>`; }).join("");
+      CAT.filter(x=>x.cat===c).map(x=>`<tr><td class="c">${x.cod||"-"}</td><td>${esc(x.name)}</td><td class="r">${w(x)}</td></tr>`).join("");
   }).join("")+`</table>`;
-  const pel=CFG.CATALOGO.find(z=>z.peligroso), mitad=pel?Math.ceil(pel.items.length/2):0;
+  const pelItems=CAT.filter(x=>x.pel), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
   const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
-    items.map(([cod,name])=>{ const x=CATBY.get(cod?cod:"n:"+fold(name)); return `<tr><td>${esc(name)}</td><td class="r">${x?w(x):""}</td></tr>`; }).join("")+`</table>`;
+    items.map(x=>`<tr><td>${esc(x.name)}</td><td class="r">${w(x)}</td></tr>`).join("")+`</table>`;
   return `<div class="off">
     <table class="of ohead"><tr>
       <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
@@ -652,9 +695,9 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <tr><td><b>Tipo de manejo:</b> <span id="ph-man"></span></td><td><b>Brevete:</b> <span id="ph-brev"></span></td><td><b>Hora de llegada:</b> <span id="ph-hora"></span></td></tr></table>
     <div class="osec">RESIDUOS NO PELIGROSOS</div>
     <div class="ocols"><div>${bloque(["Orgánico - producción","Orgánico - comedor","Plástico"])}</div>
-      <div>${bloque(["Madera","Papel y cartón","Metal","Otros aprovechables","No aprovechable","Especial"])}</div></div>
+      <div>${bloque(["Madera","Papel y cartón","Metal","Vidrio","Otros aprovechables","No aprovechable","Especial"])}</div></div>
     <div class="osec">RESIDUOS PELIGROSOS</div>
-    <div class="ocols"><div>${pel?colPel(pel.items.slice(0,mitad)):""}</div><div>${pel?colPel(pel.items.slice(mitad)):""}</div></div>
+    <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
     <div class="obs"><b>OBSERVACIONES:</b> <span id="ph-obs"></span></div>
     <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
@@ -805,6 +848,7 @@ document.addEventListener("click",e=>{
   const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); } showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
+  const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
   const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
   const tv=t.closest("[data-tv]"); if(tv){ TARA={t:"val",v:parseFloat(tv.dataset.tv)}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
   if(t.closest("[data-tn]")){ TARA={t:"none"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
@@ -831,7 +875,7 @@ $("#d-go").addEventListener("click",consultarDespacho);
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Enviando pendientes…"); sync(); });
-window.addEventListener("online",()=>{ drawNet(); sync(); });
+window.addEventListener("online",()=>{ drawNet(); sync(); cargaCatalogo(); });
 window.addEventListener("offline",()=>{ drawNet(); ACS.forEach(a=>a.abort()); });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); } });
 setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(DESPQ,{})).length)) sync(); },45000);
@@ -841,7 +885,7 @@ setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(
   HOJAS = await DB.all();
   HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
   drawNet(); drawHome(); showView();
-  if(navigator.onLine) sync();
+  if(navigator.onLine){ sync(); cargaCatalogo(); }
   if("serviceWorker" in navigator && location.protocol!=="file:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
