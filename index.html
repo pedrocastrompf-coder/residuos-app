@@ -63,7 +63,7 @@ label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:va
 .badge.ok{background:#DDEFD5;color:var(--ok)} .badge.q{background:#FFE3C2;color:#9a4d00}
 
 /* inicio: tablero y despachos */
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:2px 0 10px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px}
 .kpi .l{font-size:12px;color:var(--gray)}
 .kpi .n{font-size:22px;font-weight:bold;color:var(--brown);margin-top:2px}
@@ -73,6 +73,11 @@ label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:va
 .newcard{display:none}.newcard.open{display:block}
 #b-new{margin-bottom:6px}
 .dsec{font-size:14px;font-weight:bold;color:var(--brown);margin:14px 2px 6px}
+.vehbox{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:#FBF7F2}
+.pchs{display:flex;gap:6px;flex-wrap:wrap;padding:9px 12px}
+.pch{font:inherit;font-size:12px;font-weight:bold;border:0;border-radius:8px;padding:4px 9px;background:#E8E2DC;color:#4B4B4B}
+button.pch{border:1px dashed #9a8a7a;background:#fff;cursor:pointer}
+.pch.ok{background:#DDEFD5;color:#1E6B2E}.pch.ce{background:#DCE9F7;color:#1D4E89}.pch.ab{background:#FFE3C2;color:#8A4B00}
 .dcard{background:#fff;border:1px solid var(--line);border-radius:14px;margin:8px 0;overflow:hidden}
 .dhead{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid #F0E6DB}
 .dhead .t{flex:1;min-width:0}
@@ -229,6 +234,18 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
           <datalist id="dl-placas-d"></datalist>
           <label class="f" for="n-resp">Responsable del registro</label>
           <input id="n-resp" class="in" autocomplete="off" placeholder="Nombre y apellido">
+          <div class="vehbox hidden" id="n-veh">
+            <div class="muted">Datos del vehículo (se piden una vez por viaje)</div>
+            <label class="f" for="n-emp">Empresa operadora</label>
+            <input id="n-emp" class="in" list="dl-emp" autocomplete="off">
+            <datalist id="dl-emp"></datalist>
+            <label class="f" for="n-cond">Conductor</label>
+            <input id="n-cond" class="in" autocomplete="off" placeholder="Nombre y apellido">
+            <div class="row2">
+              <div><label class="f" for="n-brev">Brevete</label><input id="n-brev" class="in" autocomplete="off" inputmode="text"></div>
+              <div><label class="f" for="n-hora">Hora de llegada</label><input id="n-hora" class="in" type="time"></div>
+            </div>
+          </div>
           <div class="err" id="n-err"></div>
           <div style="height:10px"></div>
           <button class="btn" id="n-go">Iniciar pesaje</button>
@@ -257,13 +274,16 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 
   <!-- DESPACHO -->
   <section id="v-desp" class="hidden">
+    <div class="kpis noprint" id="d-kpis"></div>
+    <div class="noprint" id="d-list"></div>
     <div class="card noprint">
-      <h2>Consolidado por despacho</h2>
+      <h2>Consultar despacho</h2>
       <div class="muted">Consolida las hojas de todas las puertas con la misma fecha y placa (formato SGA.R.G.001).</div>
       <div class="row2">
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
         <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
       </div>
+      <div style="width:calc(50% - 6px)"><label class="f" for="d-viaje">Viaje</label><input id="d-viaje" type="number" inputmode="numeric" min="1" step="1" value="1" class="in"></div>
       <div style="height:10px"></div>
       <button class="btn" id="d-go">Consultar</button>
       <div class="err" id="d-err"></div>
@@ -315,7 +335,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 <script src="config.js"></script>
 <script>
 "use strict";
-const CFG = Object.assign({SCRIPT_URL:"",CLAVE:"",ZONA_HORARIA:"America/Lima",PLANTA:"",PUERTAS:[],PLACAS:[],TARAS_INICIALES:[],UNIDADES:[["B","Bolsas"]],TIPOS_MANEJO:[],CATALOGO:[]}, window.APP_CONFIG||{});
+const CFG = Object.assign({SCRIPT_URL:"",CLAVE:"",ZONA_HORARIA:"America/Lima",PLANTA:"",PUERTAS:[],PLACAS:[],TARAS_INICIALES:[],UNIDADES:[["B","Bolsas"]],TIPOS_MANEJO:[],EMPRESAS:[],CATALOGO:[]}, window.APP_CONFIG||{});
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
 const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -400,14 +420,22 @@ const pendHoja = h=>(h.pesadas||[]).filter(p=>p.taraPend).length;
 const dirty = h=>(h.rev||0)>(h.sync||0) && !((h.pesadas||[]).length===0 && !h.sync);
 /* despachos aprobados: sus hojas quedan solo de lectura */
 const APRK="pesaje.aprob";
-const aprobada = h=>!!LS.get(APRK,{})[h.fecha+"|"+normPlaca(h.placa)];
-function marcaAprob(f,p,v){ const m=LS.get(APRK,{}), k=f+"|"+normPlaca(p); if(v) m[k]=1; else delete m[k]; LS.set(APRK,m); }
+/* cada viaje del vehículo (misma fecha y placa) es un despacho independiente; el viaje 1 conserva la clave de siempre */
+const EMPRESAS_BASE=["Multiservicios Selma SAC","S & I Alvarez SAC","MEJ & Solutions Service SAC"];
+const vj = v=>{ const n=parseInt(v,10); return n>=1?n:1; };
+const dkey = (f,p,v)=>f+"|"+normPlaca(p)+(vj(v)>1?"|"+vj(v):"");
+const aprobada = h=>!!LS.get(APRK,{})[dkey(h.fecha,h.placa,h.viaje)];
+const VEHK="pesaje.veh";    // datos del vehículo ya capturados por viaje: {clave: {empresa,conductor,brevete,hora}}
+const vehDe = k=>{ const q=LS.get(DESPQ,{})[k]; if(q&&q.empresa&&q.conductor) return q; const c=LS.get(VEHK,{})[k]; return c&&c.empresa&&c.conductor?c:null; };
+function vehSet(k,d){ const m=LS.get(VEHK,{}); m[k]={empresa:d.empresa||"",conductor:d.conductor||"",brevete:d.brevete||"",hora:d.hora||""}; LS.set(VEHK,m); }
+const horaAhora = ()=>new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:CFG.ZONA_HORARIA}).format(new Date());
+function marcaAprob(f,p,v,viaje){ const m=LS.get(APRK,{}), k=dkey(f,p,viaje); if(v) m[k]=1; else delete m[k]; LS.set(APRK,m); }
 async function refrescaAprob(h){
   if(!CFG.SCRIPT_URL||!navigator.onLine) return;
   try{
-    const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(h.fecha)}&placa=${encodeURIComponent(normPlaca(h.placa))}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},15000);
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(h.fecha)}&placa=${encodeURIComponent(normPlaca(h.placa))}&viaje=${vj(h.viaje)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},15000);
     const j=await r.json();
-    if(j&&j.ok) marcaAprob(h.fecha,h.placa,!!(j.despacho&&j.despacho.estado==="Aprobado"));
+    if(j&&j.ok){ marcaAprob(h.fecha,h.placa,!!(j.despacho&&j.despacho.estado==="Aprobado"),h.viaje); if(j.despacho&&j.despacho.empresa) vehSet(dkey(h.fecha,h.placa,h.viaje),j.despacho); }
   }catch(e){}
 }
 
@@ -420,7 +448,7 @@ async function fetchT(url,opt={},ms=30000){
   try{ return await fetch(url,Object.assign({signal:ac.signal},opt)); } finally{ clearTimeout(t); ACS.delete(ac); }
 }
 function payloadDe(h){
-  return { key:CFG.CLAVE, action:"hoja", id:h.id, sede:CFG.PLANTA, planta:CFG.PLANTA, puerta:h.puerta, fecha:h.fecha, placa:h.placa, responsable:h.responsable, estado:h.estado,
+  return { key:CFG.CLAVE, action:"hoja", id:h.id, sede:CFG.PLANTA, planta:CFG.PLANTA, puerta:h.puerta, fecha:h.fecha, placa:h.placa, viaje:vj(h.viaje), responsable:h.responsable, estado:h.estado,
     pesadas:(h.pesadas||[]).map((p,i)=>({n:i+1,cod:p.cod,res:p.res,cat:p.cat,bruto:p.bruto,tara:p.taraPend?"":(p.tara||0),taraPend:!!p.taraPend,neto:netoDe(p),uni:p.uni||"",tu:p.uni?(p.tu||"UD"):"",ts:p.ts})) };
 }
 let syncing=null, lastErr="";
@@ -436,7 +464,7 @@ async function syncRun(){
     const sent=h.rev; let j;
     try{ j=await postJ(payloadDe(h)); }catch(e){ return; }          // sin señal: se reintenta luego
     if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
-    else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); h.rechazado=true; await DB.put(h); marcaAprob(h.fecha,h.placa,true); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
+    else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); h.rechazado=true; await DB.put(h); marcaAprob(h.fecha,h.placa,true,h.viaje); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
     else { lastErr=(j&&j.error)||"error"; return; }
   }
   const q=LS.get(DESPQ,{});
@@ -491,6 +519,7 @@ function drawHome(){
   $("#sub").textContent = CFG.PLANTA;
   $("#n-puerta").innerHTML = CFG.PUERTAS.map(p=>`<button type="button" data-p="${esc(p)}" class="${p===selPuerta?"on":""}">${esc(p)}</button>`).join("");
   $("#dl-placas").innerHTML = CFG.PLACAS.map(p=>`<option value="${esc(p)}">`).join("");
+  $("#dl-emp").innerHTML = (CFG.EMPRESAS.length?CFG.EMPRESAS:EMPRESAS_BASE).map(p=>`<option value="${esc(p)}">`).join("");
   if(!$("#n-fecha").value) $("#n-fecha").value=todayStr();
   $("#n-fecha").max=todayStr();
   if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp","");
@@ -500,41 +529,55 @@ function drawHome(){
 function openNew(v){ $("#n-card").classList.toggle("open",v===undefined?!$("#n-card").classList.contains("open"):!!v); }
 function drawHojas(){
   const hoy=todayStr(), G=new Map();
-  HOJAS.forEach(h=>{ const pl=normPlaca(h.placa), k=h.fecha+"|"+pl; if(!G.has(k)) G.set(k,{fecha:h.fecha,placa:pl,hojas:[],ts:0}); const g=G.get(k); g.hojas.push(h); g.ts=Math.max(g.ts,h.creado||0); });
+  HOJAS.forEach(h=>{ const pl=normPlaca(h.placa), k=h.fecha+"|"+pl+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{fecha:h.fecha,placa:pl,viaje:vj(h.viaje),hojas:[],ts:0}); const g=G.get(k); g.hojas.push(h); g.ts=Math.max(g.ts,h.creado||0); });
   const all=[...G.values()];
   const kgHoy=r2(HOJAS.filter(h=>h.fecha===hoy).reduce((a,h)=>a+kgHoja(h),0));
   const porAprobar=all.filter(g=>!aprobada(g.hojas[0])&&g.hojas.some(h=>(h.pesadas||[]).length)&&g.hojas.every(h=>h.estado==="cerrada")).length;
   const abiertas=HOJAS.filter(h=>h.estado!=="cerrada"&&!aprobada(h)).length;
+  const aprobHoy=all.filter(g=>g.fecha===hoy&&aprobada(g.hojas[0])).length;
   $("#kpis").innerHTML=`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div>
-    <div class="kpi ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
     <div class="kpi"><div class="l">Hojas abiertas</div><div class="n">${abiertas}</div></div>`;
-  const card=g=>{
-    const ap=aprobada(g.hojas[0]), todasCerr=g.hojas.every(h=>h.estado==="cerrada");
-    const est=ap?`<span class="bdg ap">🔒 aprobado</span>`:todasCerr?`<span class="bdg ce">listo para aprobar</span>`:`<span class="bdg ab">en curso</span>`;
-    const kg=r2(g.hojas.reduce((a,h)=>a+kgHoja(h),0));
-    const puertas=CFG.PUERTAS.concat(g.hojas.map(h=>h.puerta).filter(p=>!CFG.PUERTAS.includes(p)));
-    const filas=puertas.map(p=>{
-      const hs=g.hojas.filter(h=>h.puerta===p);
-      if(!hs.length) return `<div class="hrow0"><b style="width:64px">${esc(p)}</b><span class="muted" style="flex:1">Sin hoja</span>${ap?"":`<button class="btn sm sec" data-newp="${esc(p)}|${g.fecha}|${esc(g.placa)}">+ Crear hoja</button>`}</div>`;
-      return hs.map(h=>`<button class="hrow" data-open="${h.id}">
+  $("#d-kpis").innerHTML=`<div class="kpi ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
+    <div class="kpi"><div class="l">Aprobados hoy</div><div class="n">${aprobHoy}</div></div>`;
+  const multi=g=>g.viaje>1||all.some(x=>x.fecha===g.fecha&&x.placa===g.placa&&x.viaje>1);
+  const tit=g=>esc(g.placa)+(multi(g)?` · Viaje ${g.viaje}`:"");
+  const estado=g=>{ const ap=aprobada(g.hojas[0]), todasCerr=g.hojas.every(h=>h.estado==="cerrada");
+    return ap?`<span class="bdg ap">🔒 aprobado</span>`:todasCerr?`<span class="bdg ce">listo para aprobar</span>`:`<span class="bdg ab">en curso</span>`; };
+  const kgG=g=>r2(g.hojas.reduce((a,h)=>a+kgHoja(h),0));
+  const hojaRow=h=>`<button class="hrow" data-open="${h.id}">
         <div style="flex:1"><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div>
         ${dirty(h)&&CFG.SCRIPT_URL?'<span class="bdg q">por enviar</span>':''}
         ${(h.pesadas||[]).length===0&&(aprobada(h)||!h.sync)?`<span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}
         ${aprobada(h)?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}
-      </button>`).join("");
+      </button>`;
+  /* Pesaje: hojas agrupadas por vehículo (placa y viaje) */
+  const cardP=g=>`<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg</div></div></div>
+      <div style="padding:2px 10px 6px">${g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(hojaRow).join("")}</div></div>`;
+  /* Despacho: un control SGA.R.G.001 por vehículo y viaje, con el estado de sus puertas */
+  const cardD=g=>{
+    const ap=aprobada(g.hojas[0]);
+    const puertas=CFG.PUERTAS.concat(g.hojas.map(h=>h.puerta).filter(p=>!CFG.PUERTAS.includes(p)));
+    const chips=puertas.map(p=>{
+      const hs=g.hojas.filter(h=>h.puerta===p), pc=p.replace(/^Puerta\s*/i,"P");
+      if(!hs.length) return ap?`<span class="pch sh">${esc(pc)} sin hoja</span>`:`<button class="pch sh" data-newp="${esc(p)}|${g.fecha}|${esc(g.placa)}|${g.viaje}">${esc(pc)} sin hoja · + crear</button>`;
+      const cerr=hs.every(h=>h.estado==="cerrada");
+      return `<span class="pch ${ap?"ok":cerr?"ce":"ab"}">${esc(pc)} ${ap?"✓":cerr?"cerrada":"abierta"}</span>`;
     }).join("");
-    return `<div class="dcard"><div class="dhead"><div class="t"><b>${esc(g.placa)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kg)} kg en total</div></div>${est}</div>${filas}
-      <div class="dfoot"><button class="btn sm" data-gdesp="${g.fecha}|${esc(g.placa)}">Ver despacho</button></div></div>`;
+    return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
+      <div class="pchs">${chips}</div>
+      <div class="dfoot"><button class="btn sm" data-gdesp="${g.fecha}|${esc(g.placa)}|${g.viaje}">Ver despacho</button></div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
   const hoyG=ord.filter(g=>g.fecha===hoy), antG=ord.filter(g=>g.fecha!==hoy).slice(0,12);
-  $("#h-list").innerHTML = ord.length
-    ? (hoyG.length?`<div class="dsec" style="margin-top:2px">Despachos de hoy</div>`+hoyG.map(card).join(""):"")
-      +(antG.length?`<div class="dsec">Días anteriores</div>`+antG.map(card).join(""):"")
-    : `<div class="card muted">Sin hojas registradas en este equipo.</div>`;
+  const lista=(card,vacio)=>ord.length
+    ? (hoyG.length?`<div class="dsec" style="margin-top:2px">Hoy</div>`+hoyG.map(card).join(""):"")+(antG.length?`<div class="dsec">Días anteriores</div>`+antG.map(card).join(""):"")
+    : `<div class="card muted">${vacio}</div>`;
+  $("#h-list").innerHTML=lista(cardP,"Sin hojas registradas en este equipo.");
+  $("#d-list").innerHTML=lista(cardD,"Sin despachos registrados en este equipo.");
   drawQueue();
 }
-async function startHoja(){
+let viajeOk=null;   // viaje nuevo ya confirmado (evita preguntar dos veces mientras se completan los datos del vehículo)
+async function startHoja(viajeFijo){
   const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=$("#n-resp").value.trim().replace(/\s+/g," ");
   const e=$("#n-err"); e.textContent="";
   if(!puerta) return void(e.textContent="Seleccione la puerta.");
@@ -543,14 +586,41 @@ async function startHoja(){
   if(placa.length<5) return void(e.textContent="Ingrese la placa del vehículo.");
   if(resp.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido del responsable.");
   LS.set("pesaje.puerta",puerta); LS.set("pesaje.resp",resp); LS.set("pesaje.placa",placa);
-  const ex=HOJAS.find(h=>h.puerta===puerta&&h.fecha===fecha&&h.placa===placa);
-  if(!ex){
-    await refrescaAprob({fecha,placa});     // consulta al servidor si hay señal
-    if(aprobada({fecha,placa})) return void(e.textContent="El despacho de "+placa+" del "+fechaCorta(fecha)+" ya fue aprobado: no se pueden crear hojas nuevas. Para agregar pesadas, solicitar la reapertura del despacho.");
+  const locV=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje));
+  let v;
+  if(viajeFijo){
+    v=vj(viajeFijo); await refrescaAprob({fecha,placa,viaje:v});
+    if(aprobada({fecha,placa,viaje:v})) return void(e.textContent="El Viaje "+v+" de "+placa+" ya fue aprobado. Para un nuevo viaje, use «Nueva hoja de pesaje».");
+  } else {
+    // viaje vigente = el último de este vehículo en la fecha; si ya está aprobado, se propone un viaje nuevo
+    const v0=Math.max(1,...locV); v=v0;
+    for(let i=0;i<10;i++){ await refrescaAprob({fecha,placa,viaje:v}); if(!aprobada({fecha,placa,viaje:v})) break; v++; }
+    if(v>v0 && viajeOk!==fecha+"|"+placa+"|"+v && !confirm("El Viaje "+(v-1)+" de "+placa+" del "+fechaCorta(fecha)+" ya está aprobado.\n¿Iniciar el Viaje "+v+" como un despacho independiente?")) return void(e.textContent="Viaje no iniciado.");
+    if(v>v0) viajeOk=fecha+"|"+placa+"|"+v;
   }
+  const ex=HOJAS.find(h=>h.puerta===puerta&&h.fecha===fecha&&h.placa===placa&&vj(h.viaje)===v);
   if(ex){ toast("Hoja existente: se abrió para continuar."); return openHoja(ex.id); }
-  const h={id:uuid(),puerta,fecha,placa,responsable:resp,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
-  HOJAS.push(h); await saveHoja(h); openNew(false); openHoja(h.id);
+  // datos del vehículo (empresa, conductor, brevete, hora de llegada): se piden una sola vez por viaje
+  const kV=dkey(fecha,placa,v);
+  if(!vehDe(kV)){
+    const box=$("#n-veh");
+    if(box.classList.contains("hidden")){
+      box.classList.remove("hidden"); if(!$("#n-hora").value) $("#n-hora").value=horaAhora();
+      const ult=LS.get("pesaje.vehult",{})[placa]; if(ult){ if(!$("#n-emp").value) $("#n-emp").value=ult.empresa||""; }
+      return void(e.textContent="Complete los datos del vehículo para iniciar el pesaje.");
+    }
+    const d={empresa:$("#n-emp").value.trim(),conductor:$("#n-cond").value.trim().replace(/\s+/g," "),brevete:$("#n-brev").value.trim().toUpperCase(),hora:$("#n-hora").value};
+    if(!d.empresa) return void(e.textContent="Ingrese la empresa operadora.");
+    if(!d.conductor) return void(e.textContent="Ingrese el conductor.");
+    if(!d.brevete) return void(e.textContent="Ingrese el brevete.");
+    if(!d.hora) return void(e.textContent="Ingrese la hora de llegada.");
+    vehSet(kV,d); const ul=LS.get("pesaje.vehult",{}); ul[placa]={empresa:d.empresa}; LS.set("pesaje.vehult",ul);
+    const q=LS.get(DESPQ,{}); q[kV]={key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje:v,empresa:d.empresa,conductor:d.conductor,brevete:d.brevete,hora:d.hora,manejoNP:"",manejoP:"",obs:""}; LS.set(DESPQ,q);
+  }
+  const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
+  if(v>1) toast("Viaje "+v+" iniciado.");
+  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); $("#n-veh").classList.add("hidden"); openNew(false); openHoja(h.id);
+  sync();
 }
 function openHoja(id){
   H=HOJAS.find(h=>h.id===id); if(!H) return;
@@ -561,7 +631,7 @@ function openHoja(id){
 /* ---------- hoja ---------- */
 function drawHoja(){
   const ap = aprobada(H), ro = H.estado==="cerrada"||ap;
-  $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`;
+  $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`+((vj(H.viaje)>1||HOJAS.some(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)>1))?` · Viaje ${vj(H.viaje)}`:"");
   $("#hh-l2").textContent=`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":H.estado==="cerrada"?" · hoja cerrada":""}`;
   $("#hh-kg").textContent=fmt(kgHoja(H));
   const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
@@ -734,19 +804,20 @@ function buildDespacho(hojas){
   return {porPuerta,filas};
 }
 async function consultarDespacho(){
-  const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), e=$("#d-err"); e.textContent="";
+  const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), viaje=vj($("#d-viaje").value), e=$("#d-err"); e.textContent="";
+  $("#d-viaje").value=viaje; DVIAJE=viaje;
   if(!fecha||placa.length<5) return void(e.textContent="Seleccione la fecha e ingrese la placa.");
   let hojas=[], origen="Solo hojas de este equipo"; DSRV=null;
   if(CFG.SCRIPT_URL && navigator.onLine){
     try{
-      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
+      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&viaje=${viaje}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
       const j=await r.json();
-      if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; marcaAprob(fecha,placa,!!(DSRV&&DSRV.estado==="Aprobado")); origen="Hojas de todas las puertas (Google Sheets)"; }
+      if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; marcaAprob(fecha,placa,!!(DSRV&&DSRV.estado==="Aprobado"),viaje); origen="Hojas de todas las puertas (Google Sheets)"; }
       else e.textContent="No se pudo consultar el Google Sheet ("+((j&&j.error)||"error")+"). Se muestran solo las de este equipo.";
     }catch(x){ e.textContent="Sin conexión con el Google Sheet. Se muestran solo las hojas de este equipo."; }
   }
   // las hojas locales (más recientes) reemplazan a las del servidor con el mismo id
-  const loc=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa);
+  const loc=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&vj(h.viaje)===viaje);
   const ids=new Set(loc.map(h=>h.id));
   hojas=hojas.filter(h=>!ids.has(h.id)).concat(loc);
   drawDespacho(fecha,placa,hojas,origen);
@@ -772,7 +843,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <tr><td><b>Fecha de aprobación:</b></td><td style="text-align:center"><b>${esc(F.aprobacion||"")}</b></td></tr></table>
     <table class="og">
       <tr><td><b>Fecha de registro:</b> ${fechaCorta(fecha)}</td><td><b>Empresa Operadora:</b> <span id="ph-op"></span></td><td><b>Sede:</b> ${esc(CFG.PLANTA)}</td></tr>
-      <tr><td><b>Tipo de residuo:</b> ${esc(tipoRes)}</td><td><b>Conductor:</b> <span id="ph-cond"></span></td><td><b>Placa de vehículo:</b> ${esc(placa)}</td></tr>
+      <tr><td><b>Tipo de residuo:</b> ${esc(tipoRes)}</td><td><b>Conductor:</b> <span id="ph-cond"></span></td><td><b>Placa de vehículo:</b> ${esc(placa)}${DVIAJE>1?" · Viaje "+DVIAJE:""}</td></tr>
       <tr><td><b>Tipo de manejo:</b> <span id="ph-man"></span></td><td><b>Brevete:</b> <span id="ph-brev"></span></td><td><b>Hora de llegada:</b> <span id="ph-hora"></span></td></tr></table>
     <div class="osec">RESIDUOS NO PELIGROSOS</div>
     <div class="ocols"><div>${bloque(["Orgánico - producción","Orgánico - comedor","Plástico"])}</div>
@@ -806,7 +877,7 @@ function drawDespacho(fecha,placa,hojas,origen){
       ${pend?`<div class="warnbox">⚠ Hay ${pend} pesada${pend>1?"s":""} con tara pendiente: el consolidado incluye su peso bruto.</div>`:""}
       <div class="muted" style="margin-top:8px">Datos del despacho (se imprimen en el SGA.R.G.001 y se registran en el Registro Interno):</div>
       <div class="row2">
-        <div><label class="f" for="p-op">Empresa operadora</label><input id="p-op" class="in" autocomplete="off"></div>
+        <div><label class="f" for="p-op">Empresa operadora</label><input id="p-op" class="in" list="dl-emp" autocomplete="off"></div>
         <div><label class="f" for="p-cond">Conductor</label><input id="p-cond" class="in" autocomplete="off"></div>
       </div>
       <div class="row2">
@@ -843,15 +914,15 @@ function drawDespacho(fecha,placa,hojas,origen){
 const MANEJOS=[["COM-DIS","Comercialización - Disposición final"],["COM","Comercialización"],["DIS","Disposición final"],["DON","Donación (Aniquem)"],["VAL","Valorización"],["TRA","Tratamiento"],["VAL-DIS","Valorización - Disposición final"],["TRA-VAL-DIS","Tratamiento - Valorización - Disp. final"]];
 const MLBL=Object.fromEntries(MANEJOS);
 const DESP={op:"",cond:"",brev:"",hora:"",man:"",manP:"",obs:""};
-let DKEY="", DSTATE=null, DSRV=null, HP=false, HN=false, DHOJAS=[], DFILAS=[];
+let DVIAJE=1, DKEY="", DSTATE=null, DSRV=null, HP=false, HN=false, DHOJAS=[], DFILAS=[];
 function manTxt(){
   const a=MLBL[DESP.man]||"", b=MLBL[DESP.manP]||"";
   if(HP&&HN) return a&&b?`${a} (no peligrosos) / ${b} (peligrosos)`:(a||b);
   return HP?b:a;
 }
 function despPayload(){
-  const [fecha,placa]=DKEY.split("|");
-  return {key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,empresa:DESP.op,conductor:DESP.cond,brevete:DESP.brev,hora:DESP.hora,manejoNP:DESP.man,manejoP:DESP.manP,obs:DESP.obs};
+  const [fecha,placa,vv]=DKEY.split("|"), viaje=vj(vv);
+  return {key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje,empresa:DESP.op,conductor:DESP.cond,brevete:DESP.brev,hora:DESP.hora,manejoNP:DESP.man,manejoP:DESP.manP,obs:DESP.obs};
 }
 let dT;
 function despChanged(){
@@ -861,7 +932,7 @@ function despChanged(){
 }
 // al cambiar de despacho se cargan sus datos: primero lo que está por enviar desde este equipo, si no lo del servidor
 function cargarDesp(fecha,placa,srv){
-  const k=fecha+"|"+placa;
+  const k=dkey(fecha,placa,DVIAJE);
   const aprob=srv&&srv.estado==="Aprobado";
   if(k!==DKEY||aprob){
     DKEY=k; const q=LS.get(DESPQ,{})[k];
@@ -899,7 +970,7 @@ async function aprobarDesp(){
   if(modo==="aprobar"&&!nombre) return err("Ingrese el nombre de quien aprueba.");
   if(!clave) return err("Ingrese la clave de aprobación.");
   if(!navigator.onLine) return err("Requiere conexión con el Google Sheet.");
-  const [fecha,placa]=DKEY.split("|");
+  const [fecha,placa,vv]=DKEY.split("|"), viaje=vj(vv);
   if(modo==="aprobar"){
     const ab=DHOJAS.filter(h=>h.estado!=="cerrada").map(h=>h.puerta);
     if(ab.length) return err("Hay hojas abiertas ("+ab.join(", ")+"). Cerrarlas antes de aprobar.");
@@ -918,9 +989,9 @@ async function aprobarDesp(){
   const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
   try{
     await sync(); await sync();      // primero se sube todo lo pendiente
-    const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&dirty(h))||LS.get(DESPQ,{})[DKEY];
+    const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&vj(h.viaje)===viaje&&dirty(h))||LS.get(DESPQ,{})[DKEY];
     if(pendLocal) return err("Hay datos pendientes de sincronización. Verificar la conexión y reintentar.");
-    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,claveAprobar:clave,aprobador:nombre},60000);
+    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,claveAprobar:clave,aprobador:nombre},60000);
     if(j&&j.ok){
       if(modo==="aprobar") LS.set("pesaje.aprobador",nombre);
       toast(modo==="aprobar"?"Despacho aprobado: ya está en el Registro Interno.":"Despacho reabierto.");
@@ -937,11 +1008,11 @@ async function aprobarDesp(){
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); dlDesp(); } showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
-  const np=t.closest("[data-newp]"); if(np){ const [p,f,pl]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp",""); drawHome(); openNew(true); startHoja(); return; }
-  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; TAB="desp"; showView(); consultarDespacho(); return; }
+  const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp",""); TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
+  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho(); return; }
   const dh=t.closest("[data-delh]"); if(dh){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
@@ -956,7 +1027,7 @@ document.addEventListener("click",e=>{
   if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); $("#a-clave").value=""; return; }
   if(t.closest("#a-ok")){ aprobarDesp(); return; }
 });
-$("#n-go").addEventListener("click",startHoja);
+$("#n-go").addEventListener("click",()=>startHoja());
 $("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
 $("#b-close").addEventListener("click",cerrarOReabrir);
 $("#q").addEventListener("input",()=>drawHoja());
@@ -968,7 +1039,8 @@ $("#f-uni").addEventListener("input",drawPrev);
 $("#f-otra").addEventListener("input",()=>{ if($("#f-otra").value.trim()) TARA={t:"val",v:null}; drawTaras(); drawPrev(); });
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
 $("#d-go").addEventListener("click",consultarDespacho);
-$("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
+$("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); $("#n-veh").classList.add("hidden"); viajeOk=null; });
+$("#n-fecha").addEventListener("change",()=>$("#n-veh").classList.add("hidden"));
 $("#d-fecha").addEventListener("change",dlDesp);
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Sincronizando…"); sync(); });
