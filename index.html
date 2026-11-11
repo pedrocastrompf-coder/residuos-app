@@ -711,7 +711,7 @@ function drawHojas(){
 }
 let viajeOk=null;   // viaje nuevo ya confirmado (evita preguntar dos veces mientras se completan los datos del vehículo)
 async function startHoja(viajeFijo){
-  const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=(AUTH&&SES?SES.nombre:$("#n-resp").value).trim().replace(/\s+/g," ");
+  const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=(AUTH&&SES&&SES.rol!=="Administrador"?SES.nombre:$("#n-resp").value).trim().replace(/\s+/g," ");
   const e=$("#n-err"); e.textContent="";
   if(!puerta) return void(e.textContent="Seleccione la puerta.");
   if(!fecha) return void(e.textContent="Seleccione la fecha.");
@@ -753,7 +753,7 @@ async function startHoja(viajeFijo){
   }
   const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,usuario:AUTH&&SES?SES.usuario:"",estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
   if(v>1) toast("Viaje "+v+" iniciado.");
-  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); ["#n-emp"].forEach(i=>$(i).value=""); openNew(false); openHoja(h.id);
+  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); ["#n-emp"].forEach(i=>$(i).value=""); if(AUTH&&SES) $("#n-resp").value=SES.nombre; openNew(false); openHoja(h.id);
   sync();
 }
 function openHoja(id){
@@ -1208,7 +1208,7 @@ function drawUser(){
   if(AUTH&&SES) c.textContent="👤 "+SES.nombre.split(" ")[0];
   $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
   $("#tab-cat").classList.toggle("hidden",!can("catalogo")||!AUTH);
-  const r=$("#n-resp"); if(AUTH&&SES){ r.value=SES.nombre; r.readOnly=true; } else r.readOnly=false;
+  const r=$("#n-resp"); if(AUTH&&SES&&SES.rol!=="Administrador"){ r.value=SES.nombre; r.readOnly=true; } else { r.readOnly=false; if(AUTH&&SES&&!r.value) r.value=SES.nombre; }   // el Administrador puede registrar a nombre de otra persona
 }
 function showLogin(msg){
   $("#cta").classList.add("hidden"); $("#login").classList.remove("hidden");
