@@ -177,6 +177,8 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   #app{max-width:none;padding:0}
   #v-desp{display:block!important}
   .off{display:block}
+  .off.noap table{display:none!important}
+  .off.noap::before{content:"Despacho sin aprobar: no se puede imprimir.";display:block;font-size:12pt;padding:20px}
   .off table{border-collapse:collapse;width:100%}
   .off td,.off th{border:1px solid #000;padding:2px 4px;font-size:7.5pt;line-height:1.25;color:#000}
   .off th{background:#fff;font-weight:bold;text-align:center}
@@ -760,7 +762,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const pelItems=CAT.filter(x=>x.pel), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
   const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
     items.map(x=>`<tr><td>${esc(x.name)}</td><td class="r">${w(x)}</td></tr>`).join("")+`</table>`;
-  return `<div class="off">
+  return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}">
     <table class="of ohead"><tr>
       <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
       <td rowspan="3" class="tit">CONTROL DE DESPACHO DE RESIDUOS SÓLIDOS</td>
@@ -789,7 +791,7 @@ function drawDespacho(fecha,placa,hojas,origen){
   const pend=filas.reduce((a,r)=>a+r.pend,0);
   let body="", last="";
   filas.forEach(r=>{
-    if(r.cat!==last){ const pel=r.cat==="Peligrosos"; body+=`<tr class="catr ${pel?"pel":""}"><td colspan="${porPuerta.length+3}">${esc(r.cat)}</td></tr>`; last=r.cat; }
+    if(r.cat!==last){ const bq=bloqueDe(r.cat); body+=`<tr class="catr"><td colspan="${porPuerta.length+3}" style="background:${bq.bg};color:${bq.fg};${bq.bd||bq.esp?"box-shadow:inset 0 0 0 1px #9a9a9a;":""}">${esc(r.cat)}</td></tr>`; last=r.cat; }
     body+=`<tr><td>${r.cod?`<small>${r.cod}</small><br>`:""}${esc(r.res)}${r.pend?" ⚠":""}</td>${porPuerta.map(p=>`<td class="num">${r.pp[p]!=null?fmt(r.pp[p]):""}</td>`).join("")}<td class="num"><b>${fmt(r.total)}</b></td><td class="num">${esc(uniTxt(r.uni))}</td></tr>`;
   });
   const hayPel=filas.some(r=>r.cat==="Peligrosos"), hayNo=filas.some(r=>r.cat!=="Peligrosos");
@@ -821,7 +823,9 @@ function drawDespacho(fecha,placa,hojas,origen){
     ${filas.length?`<div class="screen-only"><div class="muted noprint" style="margin:6px 0">Detalle por puerta:</div><table class="d"><thead><tr><th>Residuo</th>${porPuerta.map(p=>`<th>${esc(p)}<br>(kg)</th>`).join("")}<th>Total<br>(kg)</th><th>UN</th></tr></thead><tbody>${body}</tbody>
       <tfoot><tr><td>TOTAL</td>${tp.map(v=>`<td class="num">${fmt(v)}</td>`).join("")}<td class="num">${fmt(gt)}</td><td></td></tr></tfoot></table></div>`
       :`<div class="card muted">No hay pesadas para esa fecha y placa.</div>`}
-    ${filas.length?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button></div>`:""}
+    ${filas.length?(DSTATE&&DSTATE.estado==="Aprobado"
+      ?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button></div>`
+      :`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print" disabled style="opacity:.5">Imprimir / guardar PDF (formato SGA.R.G.001)</button><div class="muted" style="margin-top:4px">🔒 Solo se puede imprimir cuando el despacho esté aprobado.</div></div>`):""}
     ${officialHTML(fecha,placa,filas,tipoRes)}`;
   // los datos del despacho se copian a la hoja impresa y se envían al Google Sheet
   const map={op:"p-op",cond:"p-cond",brev:"p-brev",hora:"p-hora",man:"p-man",manP:"p-manp",obs:"p-obs"};
@@ -946,7 +950,7 @@ document.addEventListener("click",e=>{
   if(t.closest("[data-tp]")){ TARA={t:"pend"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
   const ed=t.closest("[data-edit]"); if(ed){ editPesada(ed.dataset.edit); return; }
   const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
-  if(t.closest("#d-print")){ window.print(); return; }
+  if(t.closest("#d-print")){ if(!(DSTATE&&DSTATE.estado==="Aprobado")) return toast("Solo se puede imprimir un despacho aprobado."); window.print(); return; }
   if(t.closest("#a-open")){ $("#a-box").classList.remove("hidden"); t.closest("#a-open").classList.add("hidden"); return; }
   if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); $("#a-clave").value=""; return; }
   if(t.closest("#a-ok")){ aprobarDesp(); return; }
