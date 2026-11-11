@@ -200,6 +200,19 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
   .off .osign{margin-top:10px}
 }
+.lg{position:fixed;inset:0;z-index:200;background:var(--brown);display:flex;align-items:center;justify-content:center;padding:18px}
+.lg .box{background:#fff;border-radius:16px;padding:20px 18px;width:100%;max-width:380px}
+.lg h2{margin:0 0 2px;font-size:18px}
+.lg img{height:44px;display:block;margin:0 auto 10px}
+.lg .err{margin-top:8px}
+.urow{border-top:1px solid var(--line);padding:10px 0}
+.urow:first-child{border-top:0}
+.urow .nm{font-weight:bold}
+.urow .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.urow select{min-height:38px;padding:4px 8px;width:auto}
+.btn.sm2{min-height:38px;padding:0 12px;width:auto;font-size:13px}
+.bdg.inact{background:#e6e0dc;color:#5c4d44}
+@media print{.lg{display:none!important}}
 </style>
 </head>
 <body>
@@ -209,11 +222,13 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     <h1>Pesaje de residuos sólidos<small id="sub"></small></h1>
     <button class="chip q hidden" id="chip-q"></button>
     <span class="chip" id="chip-net"><i></i><span>Con conexión</span></span>
+    <button class="chip hidden" id="chip-u" title="Mi cuenta"></button>
   </div>
 
   <div class="tabs noprint">
     <button class="tab on" data-tab="hoja">Pesaje</button>
     <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
+    <button class="tab hidden" data-tab="usr" id="tab-usr">Usuarios</button>
   </div>
 
   <!-- INICIO: tablero, nueva hoja y despachos -->
@@ -290,6 +305,27 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     </div>
     <div id="d-out"></div>
   </section>
+
+  <!-- USUARIOS (solo Administrador) -->
+  <section id="v-usr" class="hidden">
+    <div class="card">
+      <h2>Crear perfil</h2>
+      <div class="muted">La persona ingresa con su usuario y esta contraseña temporal; la app le pedirá cambiarla.</div>
+      <label class="f" for="u-nom">Nombre y apellido</label>
+      <input id="u-nom" class="in" autocomplete="off">
+      <div class="row2">
+        <div><label class="f" for="u-usr">Usuario</label><input id="u-usr" class="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Ej.: alopez"></div>
+        <div><label class="f" for="u-rol">Rol</label><select id="u-rol" class="in"><option>Operador</option><option>Inspector</option><option>Administrador</option></select></div>
+      </div>
+      <label class="f" for="u-clv">Contraseña temporal</label>
+      <div style="display:flex;gap:8px"><input id="u-clv" class="in" autocomplete="off" spellcheck="false"><button class="btn sec sm2" id="u-gen" type="button">Generar</button></div>
+      <div class="muted" style="margin-top:6px"><b>Operador:</b> registra pesajes. <b>Inspector:</b> además completa el manejo, aprueba despachos y administra el catálogo. <b>Administrador:</b> todo, incluidos los usuarios.</div>
+      <div class="err" id="u-err"></div>
+      <div style="height:10px"></div>
+      <button class="btn" id="u-crear">Crear perfil</button>
+    </div>
+    <div class="card"><h2>Usuarios</h2><div id="u-list" class="muted">Cargando…</div></div>
+  </section>
 </div>
 
 <div class="dock hidden" id="dock">
@@ -329,6 +365,38 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       </div>
     </div>
   </div>
+</div>
+<!-- Inicio de sesión -->
+<div class="lg hidden" id="login">
+  <form class="box" id="lg-form" autocomplete="on">
+    <img src="img/logo.png" alt="">
+    <h2>Pesaje de residuos sólidos</h2>
+    <div class="muted" id="lg-msg">Ingrese con su usuario y contraseña.</div>
+    <label class="f" for="lg-u">Usuario</label>
+    <input id="lg-u" class="in" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label class="f" for="lg-p">Contraseña</label>
+    <input id="lg-p" class="in" type="password" autocomplete="current-password">
+    <div class="err" id="lg-err"></div>
+    <div style="height:10px"></div>
+    <button class="btn" id="lg-go" type="submit">Ingresar</button>
+  </form>
+</div>
+<!-- Mi cuenta / cambio de contraseña -->
+<div class="lg hidden" id="cta">
+  <form class="box" id="cta-form" autocomplete="off">
+    <h2 id="cta-t">Mi cuenta</h2>
+    <div class="muted" id="cta-i"></div>
+    <label class="f" for="cta-a">Contraseña actual</label>
+    <input id="cta-a" class="in" type="password" autocomplete="current-password">
+    <label class="f" for="cta-n">Contraseña nueva (mínimo 8 caracteres)</label>
+    <input id="cta-n" class="in" type="password" autocomplete="new-password">
+    <label class="f" for="cta-r">Repetir contraseña nueva</label>
+    <input id="cta-r" class="in" type="password" autocomplete="new-password">
+    <div class="err" id="cta-err"></div>
+    <div style="height:10px"></div>
+    <button class="btn" id="cta-go" type="submit">Cambiar contraseña</button>
+    <div class="row2" style="margin-top:8px"><button class="btn sec" id="cta-x" type="button">Cerrar</button><button class="btn sec" id="cta-out" type="button">Cerrar sesión</button></div>
+  </form>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -377,8 +445,8 @@ let OPENB=null;
 async function cargaCatalogo(){
   if(!CFG.SCRIPT_URL||!navigator.onLine) return;
   try{
-    const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},30000);
-    const j=await r.json();
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
+    const j=await gj(r);
     if(j&&j.ok&&j.residuos&&j.residuos.length){ LS.set(CATK,j.residuos); setCat(j.residuos); if(H&&TAB==="hoja") drawHoja(); }
   }catch(e){}
 }
@@ -389,6 +457,17 @@ const LS = {
   set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 };
 setCat(LS.get(CATK,null)||CAT_CONFIG);
+/* ---------- sesión y roles ---------- */
+const SESK="pesaje.ses";
+const AUTH=!!CFG.SCRIPT_URL;                // sin Google Sheet conectado la app funciona en modo local, sin usuarios
+let SES=LS.get(SESK,null);
+if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
+const tok=()=>SES?SES.token:"";
+const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],usuarios:["Administrador"]};
+const can=p=>!AUTH||(!!SES&&(PERM[p]||[]).includes(SES.rol));
+const ajena=h=>AUTH&&!!SES&&SES.rol==="Operador"&&!!h.usuario&&h.usuario!==SES.usuario;
+async function gj(r){ const j=await r.json(); sesionErr(j); return j; }
+function sesionErr(j){ if(!j||j.ok) return; if(j.error==="sesion") needLogin("Sesión vencida o sin acceso. Ingrese nuevamente."); else if(j.error==="cambiar_clave") openCta(true); }
 let MEM = new Map();    // respaldo si IndexedDB no está disponible
 const DB = {
   _db:null,
@@ -433,8 +512,8 @@ function marcaAprob(f,p,v,viaje){ const m=LS.get(APRK,{}), k=dkey(f,p,viaje); if
 async function refrescaAprob(h){
   if(!CFG.SCRIPT_URL||!navigator.onLine) return;
   try{
-    const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(h.fecha)}&placa=${encodeURIComponent(normPlaca(h.placa))}&viaje=${vj(h.viaje)}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},15000);
-    const j=await r.json();
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(h.fecha)}&placa=${encodeURIComponent(normPlaca(h.placa))}&viaje=${vj(h.viaje)}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},15000);
+    const j=await gj(r);
     if(j&&j.ok){ marcaAprob(h.fecha,h.placa,!!(j.despacho&&j.despacho.estado==="Aprobado"),h.viaje); if(j.despacho&&j.despacho.empresa) vehSet(dkey(h.fecha,h.placa,h.viaje),j.despacho); }
   }catch(e){}
 }
@@ -454,16 +533,19 @@ function payloadDe(h){
 let syncing=null, lastErr="";
 const DESPQ="pesaje.despq";    // despachos con datos por enviar: {clave: payload}
 async function postJ(obj,ms=60000){
-  const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(obj)},ms);
-  return r.json();
+  const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({},obj,obj.action==="login"?{}:{token:tok()}))},ms);
+  const j=await r.json(); if(obj.action!=="login") sesionErr(j); return j;
 }
 async function syncRun(){
   if(!CFG.SCRIPT_URL || !navigator.onLine) return;
   lastErr="";
+  if(AUTH&&!SES) return;                                            // sin sesión no se envía: los datos quedan en este equipo
   for(const h of HOJAS.filter(dirty).sort((a,b)=>(a.act||0)-(b.act||0))){
+    if(ajena(h)) continue;                                           // hoja de otro operador: la envía su autor
     const sent=h.rev; let j;
     try{ j=await postJ(payloadDe(h)); }catch(e){ return; }          // sin señal: se reintenta luego
     if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
+    else if(j&&j.error==="ajena") continue;
     else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); h.rechazado=true; await DB.put(h); marcaAprob(h.fecha,h.placa,true,h.viaje); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
     else { lastErr=(j&&j.error)||"error"; return; }
   }
@@ -479,13 +561,14 @@ async function syncRun(){
 function sync(){
   if(syncing) return syncing;
   syncing=syncRun().catch(()=>{}).then(()=>{ syncing=null; drawQueue(); drawHojas();
-    if(lastErr==="clave") toast("La clave no coincide con la configurada en el Google Sheet.");
+    if(lastErr==="clave") toast("La clave de la app no coincide con la configurada en el Google Sheet.");
+    if(lastErr==="permiso") toast("Su rol no permite este cambio.");
     if(lastErr==="aprobado") toast("Despacho ya aprobado: el cambio no se envió. Solicitar la reapertura.");
   });
   return syncing;
 }
 function drawQueue(){
-  const n=HOJAS.filter(dirty).length+Object.keys(LS.get(DESPQ,{})).length, c=$("#chip-q");
+  const n=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length, c=$("#chip-q");
   const show = CFG.SCRIPT_URL && n;
   c.classList.toggle("hidden",!show);
   c.textContent = show?`⏳ ${n} por enviar`:"";
@@ -498,11 +581,13 @@ let tT; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add
 /* ---------- navegación ---------- */
 let TAB="hoja";
 function showView(){
+  if(TAB==="usr"&&!can("usuarios")) TAB="hoja";
   const inHoja = TAB==="hoja" && H;
   if(inHoja) drawHoja();
   $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
   $("#v-hoja").classList.toggle("hidden",!inHoja);
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
+  $("#v-usr").classList.toggle("hidden",TAB!=="usr");
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
   window.scrollTo(0,0);
@@ -522,7 +607,8 @@ function drawHome(){
   $("#dl-emp").innerHTML = (CFG.EMPRESAS.length?CFG.EMPRESAS:EMPRESAS_BASE).map(p=>`<option value="${esc(p)}">`).join("");
   if(!$("#n-fecha").value) $("#n-fecha").value=todayStr();
   $("#n-fecha").max=todayStr();
-  if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp","");
+  drawUser();
+  if(!AUTH&&!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp","");
   if(!$("#n-placa").value) $("#n-placa").value=LS.get("pesaje.placa","");
   drawHojas();
 }
@@ -547,7 +633,7 @@ function drawHojas(){
   const hojaRow=h=>`<button class="hrow" data-open="${h.id}">
         <div style="flex:1"><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div>
         ${dirty(h)&&CFG.SCRIPT_URL?'<span class="bdg q">por enviar</span>':''}
-        ${(h.pesadas||[]).length===0&&(aprobada(h)||!h.sync)?`<span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}
+        ${can("borrarHoja")&&(h.pesadas||[]).length===0&&(aprobada(h)||!h.sync)?`<span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}
         ${aprobada(h)?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}
       </button>`;
   /* Pesaje: hojas agrupadas por vehículo (placa y viaje) */
@@ -578,14 +664,15 @@ function drawHojas(){
 }
 let viajeOk=null;   // viaje nuevo ya confirmado (evita preguntar dos veces mientras se completan los datos del vehículo)
 async function startHoja(viajeFijo){
-  const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=$("#n-resp").value.trim().replace(/\s+/g," ");
+  const puerta=selPuerta, fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), resp=(AUTH&&SES?SES.nombre:$("#n-resp").value).trim().replace(/\s+/g," ");
   const e=$("#n-err"); e.textContent="";
   if(!puerta) return void(e.textContent="Seleccione la puerta.");
   if(!fecha) return void(e.textContent="Seleccione la fecha.");
   if(fecha>todayStr()) return void(e.textContent="La fecha no puede ser futura.");
   if(placa.length<5) return void(e.textContent="Ingrese la placa del vehículo.");
+  if(AUTH&&!SES) return void(e.textContent="Inicie sesión para registrar.");
   if(resp.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido del responsable.");
-  LS.set("pesaje.puerta",puerta); LS.set("pesaje.resp",resp); LS.set("pesaje.placa",placa);
+  LS.set("pesaje.puerta",puerta); if(!AUTH) LS.set("pesaje.resp",resp); LS.set("pesaje.placa",placa);
   const locV=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje));
   let v;
   if(viajeFijo){
@@ -617,7 +704,7 @@ async function startHoja(viajeFijo){
     vehSet(kV,d); const ul=LS.get("pesaje.vehult",{}); ul[placa]={empresa:d.empresa}; LS.set("pesaje.vehult",ul);
     const q=LS.get(DESPQ,{}); q[kV]={key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje:v,empresa:d.empresa,conductor:d.conductor,brevete:d.brevete,hora:d.hora,manejoNP:"",manejoP:"",obs:""}; LS.set(DESPQ,q);
   }
-  const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
+  const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,usuario:AUTH&&SES?SES.usuario:"",estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
   if(v>1) toast("Viaje "+v+" iniciado.");
   HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); $("#n-veh").classList.add("hidden"); openNew(false); openHoja(h.id);
   sync();
@@ -630,9 +717,9 @@ function openHoja(id){
 
 /* ---------- hoja ---------- */
 function drawHoja(){
-  const ap = aprobada(H), ro = H.estado==="cerrada"||ap;
+  const ap = aprobada(H), ro = H.estado==="cerrada"||ap||ajena(H);
   $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`+((vj(H.viaje)>1||HOJAS.some(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)>1))?` · Viaje ${vj(H.viaje)}`:"");
-  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":H.estado==="cerrada"?" · hoja cerrada":""}`;
+  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":ajena(H)?" · solo lectura (hoja de otro usuario)":H.estado==="cerrada"?" · hoja cerrada":""}`;
   $("#hh-kg").textContent=fmt(kgHoja(H));
   const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
   $("#hh-un").textContent=uniTxt(u);
@@ -673,6 +760,7 @@ function drawHoja(){
 }
 
 async function cerrarOReabrir(){
+  if(ajena(H)) return toast("Hoja de "+H.responsable+": solo puede modificarla su autor o un Inspector.");
   if(aprobada(H)) return toast("Despacho aprobado: edición bloqueada.");
   if(H.estado==="cerrada"){ H.estado="abierta"; await saveHoja(H); drawHoja(); return toast("Hoja reabierta."); }
   if(!H.pesadas.length) return toast("La hoja no tiene pesadas registradas.");
@@ -695,6 +783,7 @@ function rememberTara(v){
 }
 function openSheet(key){
   CUR=CATBY.get(key); if(!CUR) return;
+  if(ajena(H)) return toast("Hoja de "+H.responsable+": solo puede modificarla su autor o un Inspector.");
   if(aprobada(H)) return toast("Despacho aprobado: solo lectura. Para corregir, solicitar la reapertura.");
   if(H.estado==="cerrada") return toast("Hoja cerrada. Reabrir para editar.");
   EDIT=null;
@@ -810,8 +899,8 @@ async function consultarDespacho(){
   let hojas=[], origen="Solo hojas de este equipo"; DSRV=null;
   if(CFG.SCRIPT_URL && navigator.onLine){
     try{
-      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&viaje=${viaje}&key=${encodeURIComponent(CFG.CLAVE)}`,{redirect:"follow"},25000);
-      const j=await r.json();
+      const r=await fetchT(`${CFG.SCRIPT_URL}?action=despacho&sede=${encodeURIComponent(CFG.PLANTA)}&fecha=${encodeURIComponent(fecha)}&placa=${encodeURIComponent(placa)}&viaje=${viaje}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},25000);
+      const j=await gj(r);
       if(j&&j.ok){ hojas=j.hojas||[]; DSRV=j.despacho||null; marcaAprob(fecha,placa,!!(DSRV&&DSRV.estado==="Aprobado"),viaje); origen="Hojas de todas las puertas (Google Sheets)"; }
       else e.textContent="No se pudo consultar el Google Sheet ("+((j&&j.error)||"error")+"). Se muestran solo las de este equipo.";
     }catch(x){ e.textContent="Sin conexión con el Google Sheet. Se muestran solo las hojas de este equipo."; }
@@ -905,7 +994,7 @@ function drawDespacho(fecha,placa,hojas,origen){
   const phMan=()=>{ $("#ph-man").textContent=manTxt(); };
   Object.keys(map).forEach(k=>{
     const inp=$("#"+map[k]); if(!inp) return;
-    inp.value=DESP[k]||""; inp.disabled=!!bloq;
+    inp.value=DESP[k]||""; inp.disabled=!!bloq||((k==="man"||k==="manP"||k==="obs")&&!can("manejo"));
     const out=$("#ph-"+k); if(out) out.textContent=DESP[k]||"";
     inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; phMan(); despChanged(); });
   });
@@ -952,23 +1041,21 @@ function aprobHTML(hayPesadas,sinHoja){
   const top=ap?`<div class="okbox">✔ Despacho aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
               :`<div class="muted">Estado: <b>Pendiente de aprobación</b>. Al aprobar, se registra en el Registro Interno y alimenta el dashboard.</div>`;
   return `<div class="card noprint" id="apr">${top}
-    <button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>
+    ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
       ${ap||!FALTAN.length?"":`<div class="sinres"><label><input type="checkbox" id="a-sinres"><span>Confirmo que en ${FALTAN.map(esc).join(" y ")} no se generaron residuos para este vehículo.</span></label><div class="muted" style="margin-top:4px">Si hubo pesadas en esa puerta, no marcar: crear y cerrar la hoja correspondiente.</div></div>`}
-      ${ap?"":`<label class="f" for="a-nom">Nombre de quien aprueba</label><input id="a-nom" class="in" autocomplete="off" value="${esc(LS.get("pesaje.aprobador",""))}">`}
-      <label class="f" for="a-clave">Clave de aprobación</label><input id="a-clave" class="in" type="password" autocomplete="off">
+      <div class="muted" style="margin-top:6px">${ap?"Reabre":"Aprueba"}: <b>${esc(SES?SES.nombre:"")}</b> (queda registrado)</div>
       <div class="row2" style="margin-top:8px"><button class="btn sec" id="a-cancel">Cancelar</button><button class="btn" id="a-ok">${ap?"Reabrir":"Aprobar"}</button></div>
       <div id="a-err" class="warnbox hidden"></div>
     </div></div>`;
 }
-const ERR_APR={clave_aprobar:"La clave de aprobación no es correcta.",sin_datos_despacho:"Faltan los datos del despacho (empresa y tipo de manejo).",ya_aprobado:"Despacho ya aprobado.",sin_pesadas:"Sin pesadas para aprobar.",clave:"La clave configurada en el Google Sheet no coincide.",aprobado:"Despacho ya aprobado."};
+const ERR_APR={permiso:"Su rol no permite esta acción.",sesion:"La sesión venció. Ingrese nuevamente.",sin_datos_despacho:"Faltan los datos del despacho (empresa y tipo de manejo).",ya_aprobado:"Despacho ya aprobado.",sin_pesadas:"Sin pesadas para aprobar.",clave:"La clave configurada en el Google Sheet no coincide.",aprobado:"Despacho ya aprobado."};
 async function aprobarDesp(){
   const box=$("#a-box"), modo=box.dataset.modo, e=$("#a-err");
   const err=m=>{ e.textContent=m; e.classList.remove("hidden"); };
   e.classList.add("hidden");
-  const nombre=modo==="aprobar"?$("#a-nom").value.trim():"", clave=$("#a-clave").value;
-  if(modo==="aprobar"&&!nombre) return err("Ingrese el nombre de quien aprueba.");
-  if(!clave) return err("Ingrese la clave de aprobación.");
+  const nombre=SES?SES.nombre:"";
+  if(!can(modo)) return err("Su rol no permite esta acción.");
   if(!navigator.onLine) return err("Requiere conexión con el Google Sheet.");
   const [fecha,placa,vv]=DKEY.split("|"), viaje=vj(vv);
   if(modo==="aprobar"){
@@ -991,9 +1078,8 @@ async function aprobarDesp(){
     await sync(); await sync();      // primero se sube todo lo pendiente
     const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&vj(h.viaje)===viaje&&dirty(h))||LS.get(DESPQ,{})[DKEY];
     if(pendLocal) return err("Hay datos pendientes de sincronización. Verificar la conexión y reintentar.");
-    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,claveAprobar:clave,aprobador:nombre},60000);
+    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,},60000);
     if(j&&j.ok){
-      if(modo==="aprobar") LS.set("pesaje.aprobador",nombre);
       toast(modo==="aprobar"?"Despacho aprobado: ya está en el Registro Interno.":"Despacho reabierto.");
       if(j.aviso) alert(j.aviso);
       return consultarDespacho();
@@ -1005,15 +1091,108 @@ async function aprobarDesp(){
   finally{ const b2=$("#a-ok"); if(b2){ b2.disabled=false; b2.textContent=modo==="aprobar"?"Aprobar":"Reabrir"; } }
 }
 
+/* ---------- inicio de sesión, cuenta y administración de usuarios ---------- */
+function drawUser(){
+  const c=$("#chip-u"); c.classList.toggle("hidden",!(AUTH&&SES));
+  if(AUTH&&SES) c.textContent="👤 "+SES.nombre.split(" ")[0];
+  $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
+  const r=$("#n-resp"); if(AUTH&&SES){ r.value=SES.nombre; r.readOnly=true; } else r.readOnly=false;
+}
+function showLogin(msg){
+  $("#cta").classList.add("hidden"); $("#login").classList.remove("hidden");
+  $("#lg-msg").textContent=msg||"Ingrese con su usuario y contraseña."; $("#lg-err").textContent=""; $("#lg-p").value="";
+  setTimeout(()=>$("#lg-u").focus(),50);
+}
+function needLogin(msg){ SES=null; LS.set(SESK,null); drawUser(); showLogin(msg); }
+function setSes(j){ SES={token:j.token,exp:j.exp,usuario:j.usuario,nombre:j.nombre,rol:j.rol,cambiar:!!j.cambiar}; LS.set(SESK,SES); }
+const ERR_LOGIN={credenciales:"Usuario o contraseña incorrectos.",bloqueado:"Demasiados intentos fallidos. Espere 10 minutos.",clave:"La clave de la app no coincide con la del Google Sheet."};
+async function doLogin(ev){
+  ev.preventDefault();
+  const u=$("#lg-u").value.trim().toLowerCase(), c=$("#lg-p").value, e=$("#lg-err"); e.textContent="";
+  if(!u||!c) return void(e.textContent="Ingrese usuario y contraseña.");
+  if(!navigator.onLine) return void(e.textContent="Se requiere conexión para iniciar sesión.");
+  const b=$("#lg-go"); b.disabled=true; b.textContent="Ingresando…";
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"login",usuario:u,clave:c},30000);
+    if(!j||!j.ok) return void(e.textContent=ERR_LOGIN[j&&j.error]||"No se pudo ingresar ("+((j&&j.error)||"error")+").");
+    setSes(j); $("#login").classList.add("hidden"); $("#lg-p").value="";
+    drawUser(); drawHome(); showView();
+    if(SES.cambiar) openCta(true); else { sync(); cargaCatalogo(); }
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
+  finally{ b.disabled=false; b.textContent="Ingresar"; }
+}
+let CTAF=false;
+function openCta(forzar){
+  CTAF=!!forzar; $("#login").classList.add("hidden"); $("#cta").classList.remove("hidden");
+  $("#cta-t").textContent=forzar?"Cambie su contraseña":"Mi cuenta";
+  $("#cta-i").textContent=forzar?"La contraseña temporal debe reemplazarse antes de continuar.":(SES?SES.nombre+" · "+SES.usuario+" · "+SES.rol:"");
+  $("#cta-x").classList.toggle("hidden",CTAF);
+  ["cta-a","cta-n","cta-r"].forEach(i=>$("#"+i).value=""); $("#cta-err").textContent="";
+  setTimeout(()=>$("#cta-a").focus(),50);
+}
+const ERR_CTA={clave_actual:"La contraseña actual no es correcta.",clave_corta:"La contraseña nueva debe tener entre 8 y 64 caracteres.",clave_igual:"La contraseña nueva debe ser distinta de la actual."};
+async function doCta(ev){
+  ev.preventDefault(); const e=$("#cta-err"); e.textContent="";
+  const a=$("#cta-a").value, n=$("#cta-n").value, r=$("#cta-r").value;
+  if(!a||!n) return void(e.textContent="Complete los campos.");
+  if(n!==r) return void(e.textContent="La contraseña nueva no coincide con su repetición.");
+  if(!navigator.onLine) return void(e.textContent="Se requiere conexión.");
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"cambiarClave",actual:a,nueva:n},30000);
+    if(!j||!j.ok) return void(e.textContent=ERR_CTA[j&&j.error]||"No se pudo cambiar ("+((j&&j.error)||"error")+").");
+    setSes(j); $("#cta").classList.add("hidden"); drawUser(); drawHome(); showView(); toast("Contraseña actualizada."); sync(); cargaCatalogo();
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
+}
+function cerrarSesion(){
+  const n=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length;
+  if(n&&!confirm("Hay "+n+" registro"+(n>1?"s":"")+" por enviar. Se enviarán cuando vuelva a iniciar sesión con conexión.\n¿Cerrar sesión?")) return;
+  H=null; TAB="hoja"; needLogin(); showView();
+}
+const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 8 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
+function claveAzar(){ const A="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>A[x%A.length]).join(""); }
+let USRS=[];
+async function drawUsuarios(){
+  const L=$("#u-list"); if(!$("#u-clv").value) $("#u-clv").value=claveAzar();
+  if(!navigator.onLine) return void(L.textContent="Requiere conexión con el Google Sheet.");
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"usuarios_listar"},30000);
+    if(!j||!j.ok) return void(L.textContent="No se pudo cargar ("+((j&&j.error)||"error")+").");
+    USRS=j.usuarios;
+    L.innerHTML=USRS.map(u=>`<div class="urow"><div class="nm">${esc(u.nombre)} <span class="bdg ${u.activo?"ap":"inact"}">${u.activo?"activo":"desactivado"}</span>${u.cambiar?' <span class="bdg q">clave temporal</span>':""}</div>
+      <div class="muted">${esc(u.usuario)}</div>
+      <div class="acts"><select class="in" data-urol="${esc(u.usuario)}">${["Operador","Inspector","Administrador"].map(r=>`<option${r===u.rol?" selected":""}>${r}</option>`).join("")}</select>
+      <button class="btn sec sm2" data-ures="${esc(u.usuario)}">Resetear contraseña</button>
+      <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
+  }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
+}
+async function usrOp(body,okMsg){
+  try{ const j=await postJ(Object.assign({key:CFG.CLAVE},body),30000);
+    if(j&&j.ok){ if(okMsg) toast(okMsg); await drawUsuarios(); return true; }
+    toast(ERR_USR[j&&j.error]||"No se pudo completar ("+((j&&j.error)||"error")+")."); await drawUsuarios(); return false;
+  }catch(x){ toast("Sin conexión con el Google Sheet."); return false; }
+}
+async function crearUsuario(){
+  const e=$("#u-err"); e.textContent="";
+  const nombre=$("#u-nom").value.trim().replace(/\s+/g," "), usuario=$("#u-usr").value.trim().toLowerCase(), rol=$("#u-rol").value, clave=$("#u-clv").value;
+  if(nombre.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido.");
+  if(!/^[a-z0-9._]{3,30}$/.test(usuario)) return void(e.textContent=ERR_USR.usuario_invalido);
+  if(clave.length<8) return void(e.textContent=ERR_USR.clave_corta);
+  const j=await postJ({key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave},30000).catch(()=>null);
+  if(!j) return void(e.textContent="Sin conexión con el Google Sheet.");
+  if(!j.ok) return void(e.textContent=ERR_USR[j.error]||"No se pudo crear ("+j.error+").");
+  alert("Perfil creado.\nUsuario: "+usuario+"\nContraseña temporal: "+clave+"\nEntréguela a la persona: deberá cambiarla al ingresar.");
+  $("#u-nom").value=""; $("#u-usr").value=""; $("#u-clv").value=claveAzar(); drawUsuarios();
+}
+
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
-  const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; if(!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp",""); TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
+  const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
   const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho(); return; }
-  const dh=t.closest("[data-delh]"); if(dh){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
+  const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
   const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
@@ -1024,8 +1203,21 @@ document.addEventListener("click",e=>{
   const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
   if(t.closest("#d-print")){ if(!(DSTATE&&DSTATE.estado==="Aprobado")) return toast("Impresión habilitada solo para despachos aprobados."); window.print(); return; }
   if(t.closest("#a-open")){ $("#a-box").classList.remove("hidden"); t.closest("#a-open").classList.add("hidden"); return; }
-  if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); $("#a-clave").value=""; return; }
+  if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); return; }
   if(t.closest("#a-ok")){ aprobarDesp(); return; }
+});
+$("#lg-form").addEventListener("submit",doLogin);
+$("#cta-form").addEventListener("submit",doCta);
+$("#cta-x").addEventListener("click",()=>$("#cta").classList.add("hidden"));
+$("#cta-out").addEventListener("click",cerrarSesion);
+$("#chip-u").addEventListener("click",()=>openCta(false));
+$("#u-gen").addEventListener("click",()=>{ $("#u-clv").value=claveAzar(); });
+$("#u-crear").addEventListener("click",crearUsuario);
+$("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-urol]"); if(sel) usrOp({action:"usuario_editar",usuario:sel.dataset.urol,rol:sel.value},"Rol actualizado."); });
+$("#u-list").addEventListener("click",ev=>{
+  const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]");
+  if(rs){ const u=rs.dataset.ures, c=claveAzar(); if(confirm("¿Resetear la contraseña de "+u+"?\nSe cerrarán sus sesiones abiertas.")) usrOp({action:"usuario_resetear",usuario:u,clave:c}).then(ok=>{ if(ok) alert("Contraseña temporal de "+u+": "+c+"\nEntréguela a la persona: deberá cambiarla al ingresar."); }); }
+  if(ac){ const u=ac.dataset.uact, x=USRS.find(z=>z.usuario===u); if(x&&confirm((x.activo?"¿Desactivar a ":"¿Activar a ")+x.nombre+"?")) usrOp({action:"usuario_editar",usuario:u,activo:!x.activo},x.activo?"Usuario desactivado.":"Usuario activado."); }
 });
 $("#n-go").addEventListener("click",()=>startHoja());
 $("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
@@ -1044,7 +1236,7 @@ $("#n-fecha").addEventListener("change",()=>$("#n-veh").classList.add("hidden"))
 $("#d-fecha").addEventListener("change",dlDesp);
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Sincronizando…"); sync(); });
-window.addEventListener("online",()=>{ drawNet(); sync(); cargaCatalogo(); });
+window.addEventListener("online",()=>{ drawNet(); if(!AUTH||SES){ sync(); cargaCatalogo(); } });
 window.addEventListener("offline",()=>{ drawNet(); ACS.forEach(a=>a.abort()); });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); } });
 setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(DESPQ,{})).length)) sync(); },45000);
@@ -1054,7 +1246,8 @@ setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(
   HOJAS = await DB.all();
   HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
   drawNet(); drawHome(); showView();
-  if(navigator.onLine){ sync(); cargaCatalogo(); }
+  if(AUTH&&!SES) showLogin(); else if(SES&&SES.cambiar) openCta(true);
+  if(navigator.onLine&&(!AUTH||SES)){ sync(); cargaCatalogo(); }
   if("serviceWorker" in navigator && location.protocol!=="file:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
