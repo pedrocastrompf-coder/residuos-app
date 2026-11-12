@@ -488,6 +488,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 const CFG = Object.assign({SCRIPT_URL:"",CLAVE:"",ZONA_HORARIA:"America/Lima",PLANTA:"",PUERTAS:[],PLACAS:[],TARAS_INICIALES:[],UNIDADES:[["B","Bolsas"]],TIPOS_MANEJO:[],EMPRESAS:[],CATALOGO:[]}, window.APP_CONFIG||{});
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>Array.from(r.querySelectorAll(s));
+const horaTxt = h=>{h=String(h||"");if(/^\d{1,2}:\d{2}/.test(h))return h.slice(0,5);const m=h.match(/(\d{1,2}):(\d{2}):\d{2}/);return m?m[1].padStart(2,"0")+":"+m[2]:"";};
 const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r2 = n=>Math.round((n+Number.EPSILON)*100)/100;
 const fmt = n=>Number(n).toLocaleString("es-PE",{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -946,7 +947,7 @@ function drawOp(){
     const d=c.d||{}, multi=c.viaje>1;
     box.innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
       <div class="card"><div class="tk" style="border:0;padding:0;margin:0;background:none"><div class="p">${esc(c.placa)}${multi?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}</div>
-      <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}${d.hora?" · llegó "+esc(d.hora):""}</div></div></div>
+      <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}${horaTxt(d.hora)?" · llegó "+esc(horaTxt(d.hora)):""}</div></div></div>
       <div class="opt">¿En qué puerta lo va a pesar?</div>
       <div class="doors">${CFG.PUERTAS.map(p=>{ const h=hojaDe(c,p), aj=h&&ajena(h);
         const sub=h?`${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}${h.estado==="cerrada"?" · terminada":" · en curso"}${aj?" · "+esc(h.responsable):""}`:"Sin pesar todavía";
@@ -1139,8 +1140,7 @@ function openSheet(key){
   EDIT=null;
   $("#sh-name").textContent=CUR.name; $("#sh-sap").textContent=CUR.cod?"SAP "+CUR.cod:"Sin código SAP";
   $("#f-tu").innerHTML=CFG.UNIDADES.map(([c,n])=>`<option value="${c}">${esc(n)} (${c})</option>`).join("");
-  const last=LS.get("pesaje.lastTara",null);
-  TARA = last && last.t ? last : {t:"val",v:tarasRec()[0]??null};
+  TARA = {t:"none"};            // por defecto: «Sin tara» seleccionado; el operario toca un peso solo si usa coche
   $("#f-tu").value=LS.get("pesaje.lastTu",CFG.UNIDADES[0][0]);
   resetForm(); drawSheet(); $("#sheet").classList.remove("hidden");
   setTimeout(()=>$("#f-bruto").focus(),60);
@@ -1198,7 +1198,7 @@ async function addPesada(){
   if(EDIT){ const i=H.pesadas.findIndex(p=>p.id===EDIT); if(i>=0) H.pesadas[i]=Object.assign({},H.pesadas[i],rec,{ts:H.pesadas[i].ts}); }
   else H.pesadas.push(Object.assign({id:uuid()},rec));
   if(rec.tara>0) rememberTara(rec.tara); TARA=rec.tara===0?{t:"none"}:{t:"val",v:rec.tara};
-  if(TARA.t==="val"&&TARA.v!=null) LS.set("pesaje.lastTara",TARA); LS.set("pesaje.lastTu",f.tu);
+  LS.set("pesaje.lastTu",f.tu);
   const edited=!!EDIT;
   await saveHoja(H);
   resetForm(); drawSheet(); $("#f-bruto").focus(); toast(edited?"Pesada actualizada":"Pesada guardada");
