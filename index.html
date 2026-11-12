@@ -609,12 +609,13 @@ async function getJ(params){
 }
 function firmaH(h){ return [h.estado,h.puerta,h.responsable,(h.pesadas||[]).map(p=>[p.res,p.bruto,p.tara,p.taraPend?1:0,p.uni].join(":")).join(",")].join("|"); }
 async function bajaDia(fecha){
+  const t0=Date.now();                                                  // lo que se modifique desde aquí es más nuevo que esta foto del servidor
   const j=await getJ({action:"hojas",sede:CFG.PLANTA,fecha});
   if(!j||!j.ok) return false;
   let cambio=false;
   for(const r of j.hojas){
     const loc=HOJAS.find(h=>h.id===r.id);
-    if(loc&&(dirty(loc)||(H&&H.id===loc.id))) continue;                 // lo local pendiente o abierto en pantalla no se pisa
+    if(loc&&(dirty(loc)||(H&&H.id===loc.id)||(loc.act||0)>=t0)) continue;                 // lo local pendiente o abierto en pantalla no se pisa
     const n=r.pesadas.length, base=Date.now();
     const h={id:r.id,puerta:r.puerta,fecha:r.fecha,placa:normPlaca(r.placa),viaje:vj(r.viaje),responsable:r.responsable,usuario:r.usuario,estado:r.estado==="cerrada"?"cerrada":"abierta",
       pesadas:r.pesadas.map((p,i)=>({key:p.cod?String(p.cod):"n:"+fold(p.res),cod:p.cod,res:p.res,cat:p.cat,bruto:+p.bruto,tara:p.taraPend?null:(p.tara===""?0:+p.tara),taraPend:!!p.taraPend,uni:p.uni||"",tu:p.tu||"",ts:(loc&&loc.pesadas[i]&&loc.pesadas[i].ts)||(base-(n-i)*1000)})),
@@ -902,6 +903,10 @@ function camionesHoy(){
     .sort((a,b)=>String((b.d&&b.d.hora)||"").localeCompare(String((a.d&&a.d.hora)||""))||a.placa.localeCompare(b.placa));
 }
 const hojaDe=(c,puerta)=>c.hojas.find(h=>h.puerta===puerta);
+function atiendeTxt(c){
+  const M=new Map(); c.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).forEach(h=>{ const n=(SES&&h.usuario===SES.usuario)?"Usted":(h.responsable||"").trim(); if(!n) return; if(!M.has(n)) M.set(n,[]); M.get(n).push(h.puerta.replace(/^Puerta\s*/i,"P")); });
+  return M.size?"Atiende: "+[...M.entries()].map(([n,ps])=>esc(n)+" ("+ps.map(esc).join(", ")+")").join(" · "):"Nadie lo atiende todavía";
+}
 function chipsPuertas(c){
   return CFG.PUERTAS.map(p=>{ const h=hojaDe(c,p), pc=p.replace(/^Puerta\s*/i,"P");
     if(!h) return `<span class="pch">${esc(pc)}</span>`;
@@ -930,7 +935,7 @@ function drawOp(){
     <div class="opt">Camiones en curso</div>`+
     (lista.length?lista.map(c=>{ const d=c.d||{}, hs=c.hojas, listo=hs.length&&hs.every(h=>h.estado==="cerrada");
       return `<button class="tk ${listo?"done":""}" data-tk="${esc(c.k)}"><div class="p">${esc(c.placa)}${c.viaje>1?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}${listo?`<span class="bdg ap">terminado</span>`:""}</div>
-        <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}</div><div class="pchs">${chipsPuertas(c)}</div></button>`; }).join("")
+        <div class="m">${esc(d.empresa||"")}</div><div class="m"><b>${atiendeTxt(c)}</b></div><div class="pchs">${chipsPuertas(c)}</div></button>`; }).join("")
       :`<div class="card muted">No hay camiones en curso. Cuando llegue uno, toque «Llegó un camión».</div>`);
 }
 function drawOpNuevo(){
