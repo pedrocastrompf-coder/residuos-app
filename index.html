@@ -427,19 +427,14 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       <h2 id="f-title">Nueva pesada</h2>
       <label class="f" for="f-bruto">Peso bruto (kg)</label>
       <input id="f-bruto" class="in big" inputmode="decimal" autocomplete="off" placeholder="0.0">
-      <label class="f">Tara del coche (kg)</label>
-      <div class="chips" id="f-taras"></div>
-      <div style="height:6px"></div>
-      <details class="mas" id="f-mas"><summary>Más opciones (otra tara, cantidad)</summary>
-      <label class="f" for="f-otra">Otra tara (kg)</label>
-      <input id="f-otra" class="in" inputmode="decimal" autocomplete="off" placeholder="Otra tara (kg)">
-      <div class="chips" id="f-taras2" style="margin-top:8px"></div>
+      <label class="f" for="f-otra">Tara del coche (kg)</label>
+      <input id="f-otra" class="in" inputmode="decimal" autocomplete="off" placeholder="Peso del coche">
+      <div class="chips" id="f-taras" style="margin-top:8px"></div>
       <label class="f">Cantidad (opcional)</label>
       <div class="row2">
         <input id="f-uni" class="in" inputmode="numeric" autocomplete="off" placeholder="Ej.: 3">
         <select id="f-tu" class="in"></select>
       </div>
-      </details>
       <div class="prev" id="f-prev">—</div>
       <div class="err" id="f-err"></div>
       <div class="stick">
@@ -1038,8 +1033,8 @@ function drawHoja(){
   const pinned=CAT.filter(x=>last.has(x.key)&&match(x)).sort((a,b)=>last.get(b.key)-last.get(a.key));
   let html="";
   const pinHtml=pinned.length?`<div class="cat rec"><span>Pesados en esta hoja</span><span>último primero</span></div>`+pinned.map(row).join(""):"";
+  html+=pinHtml;
   if(S) html+=`<div class="optool"><span>Toque el tipo de residuo</span><button class="btn sec sm" type="button" data-op="buscar">🔍 Buscar</button></div>`;
-  else html+=pinHtml;
   const rest=CAT.filter(x=>!last.has(x.key)&&match(x));
   const bl=BLOQUES.map(b=>({b,items:rest.filter(x=>b.cats.includes(x.cat)),todos:CAT.filter(x=>b.cats.includes(x.cat))}));
   const kgBloque=b=>r2(CAT.filter(x=>b.cats.includes(x.cat)).reduce((a,x)=>a+totales(H,x.key).kg,0));
@@ -1054,7 +1049,6 @@ function drawHoja(){
     }
     return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
   }).join("")+`</div>`;
-  if(S) html+=pinHtml;
   $("#lista").innerHTML = html || `<div class="card muted">Sin resultados.</div>`;
   const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(H.estado!=="cerrada"||ajena(H))));
   $("#b-back").textContent=S?"← Volver al camión":"← Hojas";
@@ -1081,12 +1075,16 @@ async function cerrarOReabrir(){
 let CUR=null;            // residuo del catálogo abierto
 let EDIT=null;           // id de pesada en edición
 let TARA={t:"val",v:null};   // {t:'val',v}|{t:'none'}|{t:'pend'}
+// taras más repetidas: se cuentan al guardar cada pesada; las iniciales de la configuración completan mientras no hay historial
 function tarasRec(){
-  const ini=LS.get("pesaje.taras",null);
-  return (ini&&ini.length?ini:CFG.TARAS_INICIALES).filter(v=>v>0).slice(0,8);
+  const fr=LS.get("pesaje.tarafrec",{}), rec=LS.get("pesaje.taras",[]);
+  const L=Object.keys(fr).map(Number).filter(v=>v>0).sort((a,b)=>fr[b]-fr[a]||rec.indexOf(a)-rec.indexOf(b));
+  rec.concat(CFG.TARAS_INICIALES).forEach(v=>{ if(v>0&&!L.includes(v)) L.push(v); });
+  return L.slice(0,6);
 }
 function rememberTara(v){
-  const L=tarasRec().filter(x=>x!==v); L.unshift(v); LS.set("pesaje.taras",L.slice(0,8));
+  const fr=LS.get("pesaje.tarafrec",{}); fr[v]=(fr[v]||0)+1; LS.set("pesaje.tarafrec",fr);
+  LS.set("pesaje.taras",[v].concat(LS.get("pesaje.taras",[]).filter(x=>x!==v)).slice(0,8));
 }
 function openSheet(key){
   CUR=CATBY.get(key); if(!CUR) return;
@@ -1099,7 +1097,6 @@ function openSheet(key){
   const last=LS.get("pesaje.lastTara",null);
   TARA = last && last.t ? last : {t:"val",v:tarasRec()[0]??null};
   $("#f-tu").value=LS.get("pesaje.lastTu",CFG.UNIDADES[0][0]);
-  $("#f-mas").open=!SIMPLE();
   resetForm(); drawSheet(); $("#sheet").classList.remove("hidden");
   setTimeout(()=>$("#f-bruto").focus(),60);
 }
@@ -1107,26 +1104,20 @@ function closeSheet(){ $("#sheet").classList.add("hidden"); CUR=null; EDIT=null;
 function resetForm(){
   EDIT=null; $("#f-bruto").value=""; $("#f-uni").value=""; $("#f-otra").value=""; $("#f-err").textContent="";
   $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent=SIMPLE()?"Guardar pesada":"Agregar pesada"; $("#f-cancel").classList.add("hidden");
+  if(TARA.t==="val"&&TARA.v!=null) $("#f-otra").value=TARA.v;   // la última tara usada queda escrita
   drawTaras(); drawPrev();
 }
 function drawTaras(){
-  const L=tarasRec();
-  if(TARA.t==="val" && TARA.v!=null && !L.includes(TARA.v)) L.unshift(TARA.v);
-  const bSin=`<button type="button" data-tn="1" class="${TARA.t==="none"?"on":""}">Sin tara</button>`, bPen=`<button type="button" data-tp="1" class="pend ${TARA.t==="pend"?"on":""}">Pendiente</button>`;
-  $("#f-taras").innerHTML = L.map(v=>`<button type="button" data-tv="${v}" class="${TARA.t==="val"&&TARA.v===v?"on":""}">${fmt(v)}</button>`).join("") + (SIMPLE()?"":bSin+bPen);
-  $("#f-taras2").innerHTML = SIMPLE()?bSin+bPen:"";
-  if(SIMPLE()&&(TARA.t!=="val"||$("#f-otra").value)) $("#f-mas").open=true;
+  const L=tarasRec(), cur=num($("#f-otra").value);
+  $("#f-taras").innerHTML = L.map(v=>`<button type="button" data-tv="${v}" class="${TARA.t==="val"&&cur===v?"on":""}">${fmt(v)}</button>`).join("")
+    + `<button type="button" data-tn="1" class="${TARA.t==="none"?"on":""}">Sin tara</button>`;
 }
 function readForm(){
   const bruto=num($("#f-bruto").value);
-  let tara=null,taraPend=false;
   const otra=$("#f-otra").value.trim();
-  if(otra){ tara=num(otra); }
-  else if(TARA.t==="val") tara=TARA.v;
-  else if(TARA.t==="none") tara=0;
-  else taraPend=true;
+  const tara=otra?num(otra):(TARA.t==="none"?0:null);
   const uni=$("#f-uni").value.trim()?parseInt($("#f-uni").value,10):null;
-  return {bruto,tara,taraPend,uni:isFinite(uni)&&uni>0?uni:null,tu:$("#f-tu").value};
+  return {bruto,tara,taraPend:false,uni:isFinite(uni)&&uni>0?uni:null,tu:$("#f-tu").value};
 }
 function drawPrev(){
   const f=readForm(), el=$("#f-prev"); el.classList.remove("bad");
@@ -1155,14 +1146,13 @@ async function addPesada(){
   const f=readForm(), e=$("#f-err"); e.textContent="";
   if(isNaN(f.bruto)||f.bruto<=0) return void(e.textContent="Ingrese el peso bruto.");
   if(!f.taraPend){
-    if(f.tara==null||isNaN(f.tara)||f.tara<0) return void(e.textContent="Seleccione la tara o marque «Sin tara» o «Pendiente».");
+    if(f.tara==null||isNaN(f.tara)||f.tara<0) return void(e.textContent="Escriba el peso del coche o toque «Sin tara».");
     if(f.bruto-f.tara<=0) return void(e.textContent="El peso bruto debe ser mayor que la tara.");
   }
   const rec={key:CUR.key,cod:CUR.cod,res:CUR.name,cat:CUR.cat,bruto:r2(f.bruto),tara:f.taraPend?null:r2(f.tara),taraPend:f.taraPend,uni:f.uni,tu:f.uni?f.tu:"",ts:Date.now()};
   if(EDIT){ const i=H.pesadas.findIndex(p=>p.id===EDIT); if(i>=0) H.pesadas[i]=Object.assign({},H.pesadas[i],rec,{ts:H.pesadas[i].ts}); }
   else H.pesadas.push(Object.assign({id:uuid()},rec));
-  if(!f.taraPend){ if(rec.tara>0) rememberTara(rec.tara); TARA={t:rec.tara===0&&!$("#f-otra").value?"none":"val",v:rec.tara}; }
-  else { const l=LS.get("pesaje.lastTara",null); TARA = l&&l.t==="val" ? l : {t:"val",v:tarasRec()[0]??null}; }   // tras una pendiente, vuelve a la última tara real
+  if(rec.tara>0) rememberTara(rec.tara); TARA=rec.tara===0?{t:"none"}:{t:"val",v:rec.tara};
   if(TARA.t==="val"&&TARA.v!=null) LS.set("pesaje.lastTara",TARA); LS.set("pesaje.lastTu",f.tu);
   const edited=!!EDIT;
   await saveHoja(H);
@@ -1171,11 +1161,10 @@ async function addPesada(){
 function editPesada(id){
   if(aprobada(H)) return toast("Despacho aprobado: edición bloqueada.");
   const p=H.pesadas.find(x=>x.id===id); if(!p) return;
-  EDIT=id; $("#f-bruto").value=p.bruto; $("#f-uni").value=p.uni||""; $("#f-otra").value="";
-  if(p.taraPend) TARA={t:"pend"}; else if(!p.tara) TARA={t:"none"}; else TARA={t:"val",v:p.tara};
+  EDIT=id; $("#f-bruto").value=p.bruto; $("#f-uni").value=p.uni||"";
+  if(p.taraPend){ TARA={t:"val",v:null}; $("#f-otra").value=""; } else if(!p.tara){ TARA={t:"none"}; $("#f-otra").value=""; } else { TARA={t:"val",v:p.tara}; $("#f-otra").value=p.tara; }
   if(p.tu) $("#f-tu").value=p.tu;
   $("#f-title").textContent="Corregir pesada"; $("#f-add").textContent="Guardar cambio"; $("#f-cancel").classList.remove("hidden");
-  if(p.uni||!p.tara||p.taraPend) $("#f-mas").open=true;
   drawTaras(); drawPrev(); drawSheet(); $("#f-bruto").focus();
 }
 let delAsk=null;
@@ -1603,9 +1592,8 @@ document.addEventListener("click",e=>{
   const cb=t.closest("[data-cb]"); if(cb){ OPENCB=OPENCB===cb.dataset.cb?null:cb.dataset.cb; drawCatList(); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
   const rk=t.closest("[data-k]"); if(rk){ openSheet(rk.dataset.k); return; }
-  const tv=t.closest("[data-tv]"); if(tv){ TARA={t:"val",v:parseFloat(tv.dataset.tv)}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
+  const tv=t.closest("[data-tv]"); if(tv){ TARA={t:"val",v:parseFloat(tv.dataset.tv)}; $("#f-otra").value=tv.dataset.tv; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
   if(t.closest("[data-tn]")){ TARA={t:"none"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
-  if(t.closest("[data-tp]")){ TARA={t:"pend"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
   const ed=t.closest("[data-edit]"); if(ed){ editPesada(ed.dataset.edit); return; }
   const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
   if(t.closest("#d-print")){ if(!(DSTATE&&DSTATE.estado==="Aprobado")) return toast("Impresión habilitada solo para despachos aprobados."); window.print(); return; }
@@ -1643,7 +1631,7 @@ $("#f-add").addEventListener("click",addPesada);
 $("#f-cancel").addEventListener("click",()=>{ resetForm(); drawSheet(); });
 $("#f-bruto").addEventListener("input",drawPrev);
 $("#f-uni").addEventListener("input",drawPrev);
-$("#f-otra").addEventListener("input",()=>{ if($("#f-otra").value.trim()) TARA={t:"val",v:null}; drawTaras(); drawPrev(); });
+$("#f-otra").addEventListener("input",()=>{ TARA={t:"val",v:num($("#f-otra").value)}; drawTaras(); drawPrev(); });
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
 $("#d-go").addEventListener("click",consultarDespacho);
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); viajeOk=null; syncVeh(); });
