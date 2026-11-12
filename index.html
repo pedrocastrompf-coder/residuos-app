@@ -258,6 +258,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 .btn.sm2{min-height:38px;padding:0 12px;width:auto;font-size:13px}
 .bdg.inact{background:#e6e0dc;color:#5c4d44}
 @media print{.lg{display:none!important}}
+.busy{opacity:.55;pointer-events:none}
 </style>
 </head>
 <body>
@@ -602,7 +603,9 @@ async function refrescaAprob(h){
 }
 
 /* ---------- hojas y despachos del día en el servidor (para ver lo registrado en otros equipos) ---------- */
-let bajando=null;
+let bajando=null, LASTDIA=0, LASTVEH=0;   // última descarga correcta del día de hoy / de la lista de vehículos
+// si el estado de hoy se descargó hace menos de un minuto, no se consulta otra vez al servidor antes de abrir
+async function aprobFresco(q){ if(q.fecha===todayStr()&&Date.now()-LASTDIA<60000) return; await refrescaAprob(q); }
 async function getJ(params){
   const q=Object.entries(params).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
   const r=await fetchT(`${CFG.SCRIPT_URL}?${q}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
@@ -625,6 +628,14 @@ async function bajaDia(fecha){
     if(loc) HOJAS[HOJAS.indexOf(loc)]=h; else HOJAS.push(h);
     await DB.put(h); cambio=true;
   }
+  // hojas ya enviadas que el servidor ya no tiene (eliminadas por un Inspector o en el Google Sheet): se retiran de este equipo
+  if(!syncing){
+    const enSrv=new Set(j.hojas.map(r=>String(r.id)));
+    for(const loc of HOJAS.filter(h=>h.fecha===fecha&&!enSrv.has(h.id)&&!h.nuevo&&!h.rechazado&&(h.rev||0)===(h.sync||0)&&!(H&&H.id===h.id)&&(h.act||0)<t0&&(h.syncT||0)<t0)){
+      HOJAS=HOJAS.filter(x=>x!==loc); await DB.del(loc.id); cambio=true;
+    }
+  }
+  if(fecha===todayStr()) LASTDIA=t0;
   (j.despachos||[]).forEach(d=>{ marcaAprob(fecha,d.placa,d.estado==="Aprobado",d.viaje); if(d.empresa&&d.conductor){ vehSet(dkey(fecha,d.placa,d.viaje),d); vehsPut(normPlaca(d.placa),d); } });
   if(cambio||j.despachos&&j.despachos.length){ drawHojas(); drawVeh(); }
   return true;
@@ -636,10 +647,10 @@ async function bajaVehiculos(){
 function refrescaDia(){
   if(!CFG.SCRIPT_URL||!navigator.onLine||(AUTH&&!SES)||(SES&&SES.cambiar)) return Promise.resolve();
   if(bajando) return bajando;
-  bajando=(async()=>{ try{ if(syncing) await syncing; const fs=[...new Set([todayStr(),$("#n-fecha").value].filter(Boolean))]; for(const f of fs) await bajaDia(f); await bajaVehiculos(); }catch(e){} })().then(()=>{ bajando=null; });
+  bajando=(async()=>{ try{ if(syncing) await syncing; const fs=[...new Set([todayStr(),$("#n-fecha").value].filter(Boolean))]; for(const f of fs) await bajaDia(f); if(Date.now()-LASTVEH>600000){ await bajaVehiculos(); LASTVEH=Date.now(); } }catch(e){} })().then(()=>{ bajando=null; });
   return bajando;
 }
-async function saveHoja(h){ h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
+async function saveHoja(h){ delete h.nuevo; h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
 
 /* ---------- sincronización con Google Sheets ---------- */
 const ACS=new Set();   // envíos en curso: se cancelan si se pierde la señal
@@ -665,7 +676,7 @@ async function syncRun(){
     if(ajena(h)) continue;                                           // hoja de otro operador: la envía su autor
     const sent=h.rev; let j;
     try{ j=await postJ(payloadDe(h)); }catch(e){ return; }          // sin señal: se reintenta luego
-    if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); await DB.put(h); }
+    if(j&&j.ok){ h.sync=Math.max(h.sync||0,sent); h.syncT=Date.now(); await DB.put(h); }
     else if(j&&j.error==="ajena") continue;
     else if(j&&j.error==="aprobado"){ h.sync=Math.max(h.sync||0,sent); h.rechazado=true; await DB.put(h); marcaAprob(h.fecha,h.placa,true,h.viaje); lastErr="aprobado"; }   // ya aprobado: no se acepta el cambio
     else { lastErr=(j&&j.error)||"error"; return; }
@@ -818,7 +829,7 @@ function drawHojas(){
   /* Inspector: resumen de lo pesado en el vehículo, por puerta y por tipo de residuo */
   const svDetalle=g=>{
     const rows=g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(h=>{ const ap=aprobada(h);
-      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b>${!ap&&can("borrarHoja")&&!(h.pesadas||[]).length&&!h.sync?` <span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}${!ap&&h.estado!=="cerrada"&&(h.pesadas||[]).length?` <button class="btn sec sm" data-svcerrar="${h.id}">Cerrar hoja</button>`:""}<div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
+      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b>${!ap&&can("borrarHoja")&&!(h.pesadas||[]).length?` <span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}${!ap&&h.estado!=="cerrada"&&(h.pesadas||[]).length?` <button class="btn sec sm" data-svcerrar="${h.id}">Cerrar hoja</button>`:""}<div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
     const M=new Map(); g.hojas.forEach(h=>(h.pesadas||[]).forEach(p=>M.set(p.cat||"Sin tipo",r2((M.get(p.cat||"Sin tipo")||0)+netoDe(p)))));
     const cats=[...M.entries()].sort((a,b)=>b[1]-a[1]).map(([c,k])=>`<span>${esc(c)} <b>${fmt(k)} kg</b></span>`).join("");
     return `<div class="sv">${rows}${cats?`<div class="cats">${cats}</div>`:""}</div>`;
@@ -863,12 +874,12 @@ async function startHoja(viajeFijo){
   const locV=HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje));
   let v;
   if(viajeFijo){
-    v=vj(viajeFijo); await refrescaAprob({fecha,placa,viaje:v});
+    v=vj(viajeFijo); await aprobFresco({fecha,placa,viaje:v});
     if(aprobada({fecha,placa,viaje:v})) return void(e.textContent="El Viaje "+v+" de "+placa+" ya fue aprobado. Para un nuevo viaje, use «Nueva hoja de pesaje».");
   } else {
     // viaje vigente = el último de este vehículo en la fecha; si ya está aprobado, se propone un viaje nuevo
     const v0=Math.max(1,...locV); v=v0;
-    for(let i=0;i<10;i++){ await refrescaAprob({fecha,placa,viaje:v}); if(!aprobada({fecha,placa,viaje:v})) break; v++; }
+    for(let i=0;i<10;i++){ await aprobFresco({fecha,placa,viaje:v}); if(!aprobada({fecha,placa,viaje:v})) break; v++; }
     if(v>v0 && viajeOk!==fecha+"|"+placa+"|"+v && !confirm("El Viaje "+(v-1)+" de "+placa+" del "+fechaCorta(fecha)+" ya está aprobado.\n¿Iniciar el Viaje "+v+" como un despacho independiente?")) return void(e.textContent="Viaje no iniciado.");
     if(v>v0) viajeOk=fecha+"|"+placa+"|"+v;
   }
@@ -995,13 +1006,23 @@ async function opSeguir(){
   if(!d.hora) return void(e.textContent="Indique la hora de llegada.");
   // viaje: si el último viaje de este camión ya fue aprobado, este es un viaje nuevo
   let v=Math.max(1,...HOJAS.filter(h=>h.fecha===hoy&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje)));
-  for(let i=0;i<10;i++){ await refrescaAprob({fecha:hoy,placa,viaje:v}); if(!aprobada({fecha:hoy,placa,viaje:v})) break; v++; }
+  for(let i=0;i<10;i++){ await aprobFresco({fecha:hoy,placa,viaje:v}); if(!aprobada({fecha:hoy,placa,viaje:v})) break; v++; }
   if(v>1&&!HOJAS.some(h=>h.fecha===hoy&&normPlaca(h.placa)===placa&&vj(h.viaje)===v)&&!confirm("Este camión ya salió hoy (despacho aprobado).\n¿Llegó otra vez? Se registrará como Viaje "+v+".")) return void(e.textContent="No se registró.");
   const kV=dkey(hoy,placa,v);
   vehSet(kV,d); vehsPut(placa,d);
   const q=LS.get(DESPQ,{}); q[kV]={key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha:hoy,placa,viaje:v,empresa:d.empresa,conductor:d.conductor,brevete:d.brevete,hora:d.hora,manejoNP:"",manejoP:"",obs:""}; LS.set(DESPQ,q);
   drawQueue(); sync();
   OP={v:"camion",k:hoy+"|"+placa+"|"+v}; if(v>1) toast("Viaje "+v+" iniciado."); drawOp();
+}
+function descartaNueva(){ if(H&&H.nuevo&&!(H.pesadas||[]).length){ const x=H; HOJAS=HOJAS.filter(h=>h!==x); } }
+async function borrarHojaVacia(h){
+  const soloLocal=((h.rev||0)>0&&!h.sync)||aprobada(h)||!CFG.SCRIPT_URL;      // nunca llegó al Google Sheet: basta con quitarla de este equipo
+  if(!soloLocal){
+    if(!navigator.onLine){ drawHojas(); return toast("Requiere conexión para eliminarla del Google Sheet."); }
+    let j; try{ j=await postJ({key:CFG.CLAVE,action:"hoja_borrar",id:h.id},30000); }catch(e){ drawHojas(); return toast("Sin conexión con el Google Sheet. Reintentar."); }
+    if(!j||!j.ok){ drawHojas(); return toast(j&&j.error==="con_pesadas"?"La hoja ya tiene pesadas registradas: no se eliminó.":j&&j.error==="aprobado"?"Despacho aprobado: no se puede eliminar.":"No se pudo eliminar ("+((j&&j.error)||"error")+")."); }
+  }
+  HOJAS=HOJAS.filter(x=>x!==h); await DB.del(h.id); drawHojas(); toast("Hoja eliminada.");
 }
 let OPBUSY=false;
 async function opPuerta(puerta){
@@ -1010,10 +1031,10 @@ async function opPuerta(puerta){
 async function opPuerta_(puerta){
   const c=camionesHoy().find(x=>x.k===OP.k); if(!c) return;
   const ex=hojaDe(c,puerta); if(ex) return openHoja(ex.id);
-  await refrescaAprob({fecha:todayStr(),placa:c.placa,viaje:c.viaje});
+  await aprobFresco({fecha:todayStr(),placa:c.placa,viaje:c.viaje});
   if(aprobada({fecha:todayStr(),placa:c.placa,viaje:c.viaje})) return toast("Este camión ya fue despachado.");
-  const h={id:uuid(),puerta,fecha:todayStr(),placa:c.placa,viaje:c.viaje,responsable:SES.nombre,usuario:SES.usuario,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
-  HOJAS.push(h); await saveHoja(h); LS.set("pesaje.puerta",puerta); openHoja(h.id);
+  const h={id:uuid(),puerta,fecha:todayStr(),placa:c.placa,viaje:c.viaje,responsable:SES.nombre,usuario:SES.usuario,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0,nuevo:true};
+  HOJAS.push(h); LS.set("pesaje.puerta",puerta); openHoja(h.id);      // se guarda recién con la primera pesada: no quedan hojas vacías
 }
 async function opTerminar(){
   const c=camionesHoy().find(x=>x.k===OP.k); if(!c) return;
@@ -1217,19 +1238,27 @@ function buildDespacho(hojas){
 }
 /* búsqueda por fecha (placa y viaje opcionales): lista los despachos de ese día */
 async function buscarDespachos(){
-  const fecha=$("#d-fecha").value, pl=normPlaca($("#d-placa").value), vtxt=$("#d-viaje").value.trim(), e=$("#d-err"), R=$("#d-res"); e.textContent=""; R.innerHTML="";
+  const fecha=$("#d-fecha").value, pl=normPlaca($("#d-placa").value), vtxt=$("#d-viaje").value.trim(), e=$("#d-err"), R=$("#d-res"), bt=$("#d-go"); e.textContent=""; R.innerHTML="";
   if(!fecha) return void(e.textContent="Seleccione la fecha.");
   if(pl.length>=5&&vtxt) return consultarDespacho();           // sabe todo: abre directo
-  if(CFG.SCRIPT_URL&&navigator.onLine){ try{ await bajaDia(fecha); }catch(x){} }
-  const G=new Map();
-  HOJAS.filter(h=>h.fecha===fecha&&(!pl||normPlaca(h.placa).includes(pl))&&(!vtxt||vj(h.viaje)===vj(vtxt))).forEach(h=>{ const p=normPlaca(h.placa), k=p+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{placa:p,viaje:vj(h.viaje),hojas:[]}); G.get(k).hojas.push(h); });
-  const gs=[...G.values()].sort((a,b)=>a.placa<b.placa?-1:a.placa>b.placa?1:a.viaje-b.viaje);
-  if(!gs.length) return void(e.textContent="No hay despachos"+(pl?" de esa placa":"")+" en esa fecha.");
-  if(gs.length===1){ $("#d-placa").value=gs[0].placa; $("#d-viaje").value=gs[0].viaje; return consultarDespacho(); }
-  R.innerHTML=`<div class="muted" style="margin:10px 0 4px">${gs.length} despachos el ${esc(fecha)}. Toque uno para abrirlo:</div>`+gs.map(g=>{
+  const grupos=()=>{ const G=new Map();
+    HOJAS.filter(h=>h.fecha===fecha&&(!pl||normPlaca(h.placa).includes(pl))&&(!vtxt||vj(h.viaje)===vj(vtxt))).forEach(h=>{ const p=normPlaca(h.placa), k=p+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{placa:p,viaje:vj(h.viaje),hojas:[]}); G.get(k).hojas.push(h); });
+    return [...G.values()].sort((a,b)=>a.placa<b.placa?-1:a.placa>b.placa?1:a.viaje-b.viaje); };
+  const pinta=(gs,act)=>{ R.innerHTML=gs.length?`<div class="muted" style="margin:10px 0 4px">${gs.length} despacho${gs.length>1?"s":""} el ${esc(fechaCorta(fecha))}${act?" · actualizando…":""}. Toque uno para abrirlo:</div>`+gs.map(g=>{
     const kg=r2(g.hojas.reduce((a,h)=>a+kgHoja(h),0)), ap=aprobada(g.hojas[0]);
     return `<div class="sv"><div class="r" data-gdesp="${esc(fecha)}|${esc(g.placa)}|${g.viaje}" style="cursor:pointer"><div><b>${esc(g.placa)}</b> · Viaje ${g.viaje}<div class="muted">${g.hojas.length} puerta(s)</div></div><div style="text-align:right"><b>${fmt(kg)} kg</b><div class="muted">${ap?"Aprobado":"Pendiente"}</div></div></div></div>`;
-  }).join("");
+  }).join(""):(act?`<div class="muted" style="margin:10px 0 4px">Consultando…</div>`:""); };
+  const enLinea=CFG.SCRIPT_URL&&navigator.onLine;
+  if(enLinea){
+    pinta(grupos(),true);                                       // al instante: lo que ya está en este equipo
+    bt.classList.add("busy"); bt.textContent="Consultando…";
+    try{ await bajaDia(fecha); }catch(x){} finally{ bt.classList.remove("busy"); bt.textContent="Consultar"; }
+    if($("#d-fecha").value!==fecha) return;                     // cambió la búsqueda mientras tanto
+  }
+  const gs=grupos();
+  if(!gs.length){ R.innerHTML=""; return void(e.textContent="No hay despachos"+(pl?" de esa placa":"")+" en esa fecha."); }
+  if(gs.length===1){ $("#d-placa").value=gs[0].placa; $("#d-viaje").value=gs[0].viaje; R.innerHTML=""; return consultarDespacho(); }
+  pinta(gs,false);
 }
 async function consultarDespacho(){
   const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), viaje=vj($("#d-viaje").value), e=$("#d-err"); e.textContent="";
@@ -1420,7 +1449,8 @@ async function aprobarDesp(){
   const clave=$("#a-clave").value; if(!clave) return err("Ingrese su clave para confirmar.");
   const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
   try{
-    await sync(); await sync();      // primero se sube todo lo pendiente
+    clearTimeout(dT);
+    if(syncing||HOJAS.some(h=>dirty(h)&&!ajena(h))||Object.keys(LS.get(DESPQ,{})).length) await sync();      // primero se sube lo pendiente (si lo hay)
     const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&vj(h.viaje)===viaje&&dirty(h))||LS.get(DESPQ,{})[DKEY];
     if(pendLocal) return err("Hay datos pendientes de sincronización. Verificar la conexión y reintentar.");
     const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,claveConfirma:clave},60000);
@@ -1558,7 +1588,7 @@ async function doCta(ev){
 function cerrarSesion(){
   const n=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length;
   if(n&&!confirm("Hay "+n+" registro"+(n>1?"s":"")+" por enviar. Se enviarán cuando vuelva a iniciar sesión con conexión.\n¿Cerrar sesión?")) return;
-  H=null; TAB="hoja"; OP={v:"inicio",k:null}; needLogin(); showView();
+  descartaNueva(); H=null; TAB="hoja"; OP={v:"inicio",k:null}; needLogin(); showView();
 }
 const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 4 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
 function claveAzar(){ const A="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>A[x%A.length]).join(""); }
@@ -1612,12 +1642,12 @@ document.addEventListener("click",e=>{
   const opb=t.closest("[data-op]"); if(opb){ const a=opb.dataset.op;
     if(a==="inicio"){ OP={v:"inicio",k:null}; drawOp(); window.scrollTo(0,0); }
     else if(a==="nuevo") drawOpNuevo();
-    else if(a==="seguir") opSeguir();
+    else if(a==="seguir"){ if(opb.classList.contains("busy")) return; opb.classList.add("busy"); const tx=opb.textContent; opb.textContent="Verificando…"; opSeguir().finally(()=>{ if(opb.isConnected){ opb.classList.remove("busy"); opb.textContent=tx; } }); }
     else if(a==="fin") opTerminar();
     else if(a==="buscar"){ OPSRCH=!OPSRCH; if(!OPSRCH) $("#q").value=""; drawHoja(); if(OPSRCH) $("#q").focus(); }
     return; }
   const tkc=t.closest("[data-tk]"); if(tkc){ OP={v:"camion",k:tkc.dataset.tk}; drawOp(); window.scrollTo(0,0); return; }
-  const dr=t.closest("[data-door]"); if(dr){ opPuerta(dr.dataset.door); return; }
+  const dr=t.closest("[data-door]"); if(dr){ dr.classList.add("busy"); opPuerta(dr.dataset.door).finally(()=>dr.classList.remove("busy")); return; }
   const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
   if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
   const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
@@ -1625,10 +1655,10 @@ document.addEventListener("click",e=>{
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
-  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho().then(()=>window.scrollTo({top:0})); return; }
+  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); if(CFG.SCRIPT_URL&&navigator.onLine) toast("Consultando el Google Sheet…"); consultarDespacho().then(()=>window.scrollTo({top:0})); return; }
   if(t.closest("#d-back")){ modoDetalle(false); drawHojas(); window.scrollTo({top:0}); return; }
   const sc=t.closest("[data-svcerrar]"); if(sc){ const h=HOJAS.find(x=>x.id===sc.dataset.svcerrar); if(h&&h.estado!=="cerrada"&&confirm("¿Cerrar la hoja de "+h.puerta+" de "+h.responsable+"?\nSi esa persona sigue pesando, tendrá que reabrirla.")){ h.estado="cerrada"; saveHoja(h).then(()=>{ drawHojas(); toast("Hoja cerrada."); }); } return; }
-  const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
+  const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ dh.classList.add("busy"); borrarHojaVacia(h); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const cb=t.closest("[data-cb]"); if(cb){ OPENCB=OPENCB===cb.dataset.cb?null:cb.dataset.cb; drawCatList(); return; }
   const bk=t.closest("[data-b]"); if(bk){ OPENB=OPENB===bk.dataset.b?null:bk.dataset.b; drawHoja(); return; }
@@ -1664,7 +1694,7 @@ $("#u-list").addEventListener("click",ev=>{
   if(ac){ const u=ac.dataset.uact, x=USRS.find(z=>z.usuario===u); if(x&&confirm((x.activo?"¿Desactivar a ":"¿Activar a ")+x.nombre+"?")) usrOp({action:"usuario_editar",usuario:u,activo:!x.activo},x.activo?"Usuario desactivado.":"Usuario activado."); }
 });
 $("#n-go").addEventListener("click",()=>startHoja());
-$("#b-back").addEventListener("click",()=>{ if(SIMPLE()){ OP={v:"camion",k:dkOp(H)}; OPSRCH=false; H=null; showView(); return; } H=null; drawHome(); showView(); });
+$("#b-back").addEventListener("click",()=>{ if(SIMPLE()){ OP={v:"camion",k:dkOp(H)}; OPSRCH=false; descartaNueva(); H=null; showView(); return; } H=null; drawHome(); showView(); });
 $("#b-close").addEventListener("click",cerrarOReabrir);
 $("#q").addEventListener("input",()=>drawHoja());
 $("#sh-x").addEventListener("click",closeSheet);
@@ -1688,10 +1718,24 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet
 setInterval(()=>{ if(!document.hidden) refrescaDia(); },30000);
 setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(DESPQ,{})).length)) sync(); },45000);
 
+/* Limpieza del equipo: con Google Sheet conectado, el historial vive en el Sheet. Aquí solo se conserva lo reciente
+   y todo lo que aún no se envió. Lo antiguo se vuelve a descargar al buscarlo por fecha. */
+const DIAS_LOCAL=45;
+function limpiaEquipo(){
+  if(!CFG.SCRIPT_URL) return;                       // modo local: este equipo es el único registro, no se borra nada
+  const hoy=todayStr(), d=new Date(hoy+"T12:00:00Z"); d.setUTCDate(d.getUTCDate()-DIAS_LOCAL); const lim=d.toISOString().slice(0,10);
+  for(const h of HOJAS.slice()){
+    const vacia=!h.pesadas.length, vieja=h.fecha<lim&&!dirty(h), huerfana=vacia&&!h.sync&&h.fecha<hoy;   // huérfana: hoja vacía de días anteriores que nunca se envió
+    if(vieja||huerfana){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id); }
+  }
+  [APRK,VEHK].forEach(K=>{ const m=LS.get(K,{}); let c=false; Object.keys(m).forEach(k=>{ const f=k.split("|")[0]; if(/^\d{4}-\d{2}-\d{2}$/.test(f)&&f<lim){ delete m[k]; c=true; } }); if(c) LS.set(K,m); });
+}
+
 /* ---------- arranque ---------- */
 (async function init(){
   HOJAS = await DB.all();
   HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
+  limpiaEquipo();
   drawNet(); drawHome(); showView();
   if(AUTH&&!SES) showLogin(); else if(SES&&SES.cambiar) openCta(true);
   if(navigator.onLine&&(!AUTH||SES)){ sync(); cargaCatalogo(); refrescaDia(); }
