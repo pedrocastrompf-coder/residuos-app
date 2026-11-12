@@ -337,6 +337,9 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
         <div class="muted" id="hh-un" style="text-align:right"></div>
       </div>
       <div class="warnbox hidden" id="hh-warn"></div>
+      <div class="warnbox hidden" id="hh-reab"><b>Despacho aprobado.</b> Para corregir pesos, reábrelo con tu clave; después de corregir, cierra la hoja y vuelve a aprobar el despacho.
+        <input id="hh-rclave" class="in" type="password" autocomplete="current-password" placeholder="Tu clave" style="margin-top:6px">
+        <button class="btn sm" id="hh-rok" style="margin-top:6px">🔓 Reabrir despacho para corregir</button><div id="hh-rerr" class="err"></div></div>
     </div>
     <input id="q" class="in search" placeholder="Buscar residuo (ej.: cartón, chocolate)…" autocomplete="off">
     <div id="lista"></div>
@@ -733,7 +736,7 @@ function showView(){
   if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
   if(TAB==="act"&&!can("actividad")) TAB="hoja";
   if(TAB==="desp"&&SIMPLE()) TAB="hoja";
-  if(TAB==="hoja"&&SUPERV()){ TAB="desp"; entraDesp(); }
+  if(TAB==="hoja"&&SUPERV()&&!H){ TAB="desp"; entraDesp(); }
   const inHoja = TAB==="hoja" && H, simple=SIMPLE();
   if(inHoja) drawHoja();
   $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H && !simple));
@@ -830,7 +833,7 @@ function drawHojas(){
   /* Inspector: resumen de lo pesado en el vehículo, por puerta y por tipo de residuo */
   const svDetalle=g=>{
     const rows=g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(h=>{ const ap=aprobada(h);
-      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b>${!ap&&can("borrarHoja")&&!(h.pesadas||[]).length?` <span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}${!ap&&h.estado!=="cerrada"&&(h.pesadas||[]).length?` <button class="btn sec sm" data-svcerrar="${h.id}">Cerrar hoja</button>`:""}<div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
+      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b> <button class="btn sec sm" data-open="${h.id}">${ap?"Ver":"Editar pesos"}</button>${!ap&&can("borrarHoja")&&!(h.pesadas||[]).length?` <span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}${!ap&&h.estado!=="cerrada"&&(h.pesadas||[]).length?` <button class="btn sec sm" data-svcerrar="${h.id}">Cerrar hoja</button>`:""}<div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
     const M=new Map(); g.hojas.forEach(h=>(h.pesadas||[]).forEach(p=>M.set(p.cat||"Sin tipo",r2((M.get(p.cat||"Sin tipo")||0)+netoDe(p)))));
     const cats=[...M.entries()].sort((a,b)=>b[1]-a[1]).map(([c,k])=>`<span>${esc(c)} <b>${fmt(k)} kg</b></span>`).join("");
     return `<div class="sv">${rows}${cats?`<div class="cats">${cats}</div>`:""}</div>`;
@@ -1063,6 +1066,7 @@ function drawHoja(){
   const aviso = ap ? (H.rechazado?"🔒 Despacho aprobado: ya no se puede editar. Los últimos cambios hechos en este equipo NO se guardaron en el Registro. Solicitar la reapertura del despacho.":"🔒 Despacho aprobado: solo lectura. Para corregir, el inspector debe reabrir el despacho.")
                    : pend?`⚠ ${pend} pesada${pend>1?"s":""} con tara pendiente: el peso registrado es bruto hasta completar la tara.`:"";
   w.classList.toggle("hidden",!aviso); w.textContent=aviso;
+  const rb=$("#hh-reab"); if(rb) rb.classList.toggle("hidden",!(ap&&can("reabrir")&&!S&&CFG.SCRIPT_URL));
   const q=fold($("#q").value.trim());
   const match=x=>!q || fold(x.name+" "+x.cod+" "+x.cat).includes(q);
   const row=x=>{
@@ -1465,6 +1469,26 @@ async function aprobarDesp(){
   }catch(x){ err("Sin conexión con el Google Sheet. Reintentar."); }
   finally{ const b2=$("#a-ok"); if(b2){ b2.disabled=false; b2.textContent=modo==="aprobar"?"Aprobar":"Reabrir"; } }
 }
+
+async function reabrirDesdeHoja(){
+  const e=$("#hh-rerr"), clave=$("#hh-rclave").value; e.textContent="";
+  if(!H||!aprobada(H)) return;
+  if(!clave) return void(e.textContent="Ingrese su clave para confirmar.");
+  const bt=$("#hh-rok"); bt.disabled=true; bt.textContent="Enviando…";
+  try{
+    if(syncing||HOJAS.some(h=>dirty(h)&&!ajena(h))) await sync();
+    const j=await postJ({key:CFG.CLAVE,action:"reabrir",sede:CFG.PLANTA,fecha:H.fecha,placa:normPlaca(H.placa),viaje:vj(H.viaje),claveConfirma:clave},60000);
+    if(j&&j.ok){
+      marcaAprob(H.fecha,H.placa,false,H.viaje);
+      for(const h of HOJAS.filter(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)===vj(H.viaje))){ if(h.rechazado){ h.rechazado=false; await DB.put(h); } }
+      $("#hh-rclave").value=""; drawHoja();
+      return toast("Despacho reabierto. Corrige los pesos, cierra la hoja y vuelve a aprobar el despacho.");
+    }
+    e.textContent=ERR_APR[j&&j.error]||("No se pudo reabrir ("+((j&&j.error)||"error")+").");
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet. Reintentar."; }
+  finally{ const b2=$("#hh-rok"); if(b2){ b2.disabled=false; b2.textContent="🔓 Reabrir despacho para corregir"; } }
+}
+$("#hh-rok").addEventListener("click",reabrirDesdeHoja);
 
 /* ---------- administración del catálogo (Inspector y Administrador) ---------- */
 let CATADM=[], CATAD_EDIT=null, CATAD_META={categorias:[],manejos:[]};
