@@ -73,6 +73,12 @@ label.f{display:block;font-weight:bold;font-size:13px;margin:10px 0 4px;color:va
 .newcard{display:none}.newcard.open{display:block}
 #b-new{margin-bottom:6px}
 .dsec{font-size:14px;font-weight:bold;color:var(--brown);margin:14px 2px 6px}
+.qwarn{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#FFF4E5;border:1.5px solid var(--orange);border-radius:12px;padding:9px 12px;margin:8px 0;font-size:13px;color:#7a4a00}
+.qwarn .btn{width:auto;flex:none}
+.vchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.vchips button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-weight:bold;color:var(--brown);min-height:36px}
+.vchips .vl{font-size:12px;color:var(--gray);align-self:center}
+.arow{border-top:1px solid var(--line);padding:8px 0;font-size:13px}.arow:first-child{border-top:0}.arow b{display:block}.arow .muted{font-size:12px}
 .vehbox{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:12px;background:#FBF7F2}
 .pchs{display:flex;gap:6px;flex-wrap:wrap;padding:9px 12px}
 .pch{font:inherit;font-size:12px;font-weight:bold;border:0;border-radius:8px;padding:4px 9px;background:#E8E2DC;color:#4B4B4B}
@@ -231,11 +237,14 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     <button class="chip hidden" id="chip-u" title="Mi cuenta"></button>
   </div>
 
+  <div class="qwarn noprint hidden" id="q-warn"><span id="q-txt"></span><button class="btn sm" id="q-now" type="button">Enviar ahora</button></div>
+
   <div class="tabs noprint">
     <button class="tab on" data-tab="hoja">Pesaje</button>
     <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
     <button class="tab hidden" data-tab="cat" id="tab-cat">Catálogo</button>
     <button class="tab hidden" data-tab="usr" id="tab-usr">Usuarios</button>
+    <button class="tab hidden" data-tab="act" id="tab-act">Actividad</button>
   </div>
 
   <!-- INICIO: tablero, nueva hoja y despachos -->
@@ -252,6 +261,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
           <input id="n-fecha" type="date" class="in">
           <label class="f" for="n-placa">Placa del vehículo de despacho</label>
           <input id="n-placa" class="in" list="dl-placas" autocapitalize="characters" autocomplete="off" placeholder="Ej.: ABZ-937">
+          <div class="vchips hidden" id="n-vh"></div>
           <datalist id="dl-placas"></datalist>
           <datalist id="dl-placas-d"></datalist>
           <label class="f" for="n-resp">Responsable del registro</label>
@@ -262,7 +272,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
             <input id="n-emp" class="in" list="dl-emp" autocomplete="off">
             <datalist id="dl-emp"></datalist>
             <label class="f" for="n-cond">Conductor</label>
-            <input id="n-cond" class="in" autocomplete="off" placeholder="Nombre y apellido">
+            <input id="n-cond" class="in" list="dl-cond" autocomplete="off" placeholder="Nombre y apellido"><datalist id="dl-cond"></datalist>
             <div class="row2">
               <div><label class="f" for="n-brev">Brevete</label><input id="n-brev" class="in" autocomplete="off" inputmode="text"></div>
               <div><label class="f" for="n-hora">Hora de llegada</label><input id="n-hora" class="in" type="time"></div>
@@ -306,12 +316,17 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
         <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
       </div>
-      <div style="width:calc(50% - 6px)"><label class="f" for="d-viaje">Viaje</label><input id="d-viaje" type="number" inputmode="numeric" min="1" step="1" value="1" class="in"></div>
+      <div style="width:calc(50% - 6px)"><label class="f" for="d-viaje">Viaje <span class="muted">(1 = primera salida del día; si el mismo vehículo sale otra vez, es el viaje 2)</span></label><input id="d-viaje" type="number" inputmode="numeric" min="1" step="1" value="1" class="in"></div>
       <div style="height:10px"></div>
       <button class="btn" id="d-go">Consultar</button>
       <div class="err" id="d-err"></div>
     </div>
     <div id="d-out"></div>
+  </section>
+
+  <!-- ACTIVIDAD (solo Administrador) -->
+  <section id="v-act" class="hidden">
+    <div class="card"><h2>Actividad reciente</h2><div class="muted">Últimos 150 movimientos: hojas, despachos, catálogo y usuarios.</div><div id="a-list" style="margin-top:8px">Cargando…</div></div>
   </section>
 
   <!-- CATÁLOGO (Inspector y Administrador) -->
@@ -339,7 +354,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   <section id="v-usr" class="hidden">
     <div class="card">
       <h2>Crear perfil</h2>
-      <div class="muted">La persona ingresa con su usuario y esta contraseña temporal; la app le pedirá cambiarla.</div>
+      <div class="muted">La persona ingresa con su usuario y esta contraseña. Si dejas marcada la casilla de abajo, la app le pedirá cambiarla.</div>
       <label class="f" for="u-nom">Nombre y apellido</label>
       <input id="u-nom" class="in" autocomplete="off">
       <div class="row2">
@@ -348,6 +363,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       </div>
       <label class="f" for="u-clv">Contraseña temporal</label>
       <div style="display:flex;gap:8px"><input id="u-clv" class="in" autocomplete="off" spellcheck="false"><button class="btn sec sm2" id="u-gen" type="button">Generar</button></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px"><input type="checkbox" id="u-cambiar" checked> Exigir que cambie la contraseña en su primer ingreso (recomendado)</label>
       <div class="muted" style="margin-top:6px"><b>Operador:</b> registra pesajes. <b>Inspector:</b> además completa el manejo, aprueba despachos y administra el catálogo. <b>Administrador:</b> todo, incluidos los usuarios.</div>
       <div class="err" id="u-err"></div>
       <div style="height:10px"></div>
@@ -492,7 +508,7 @@ const AUTH=!!CFG.SCRIPT_URL;                // sin Google Sheet conectado la app
 let SES=LS.get(SESK,null);
 if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
 const tok=()=>SES?SES.token:"";
-const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],usuarios:["Administrador"]};
+const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
 const can=p=>!AUTH||(!!SES&&(PERM[p]||[]).includes(SES.rol));
 const ajena=h=>AUTH&&!!SES&&SES.rol==="Operador"&&!!h.usuario&&h.usuario!==SES.usuario;
 async function gj(r){ const j=await r.json(); sesionErr(j); return j; }
@@ -547,6 +563,43 @@ async function refrescaAprob(h){
   }catch(e){}
 }
 
+/* ---------- hojas y despachos del día en el servidor (para ver lo registrado en otros equipos) ---------- */
+let bajando=null;
+async function getJ(params){
+  const q=Object.entries(params).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+  const r=await fetchT(`${CFG.SCRIPT_URL}?${q}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
+  return gj(r);
+}
+function firmaH(h){ return [h.estado,h.puerta,h.responsable,(h.pesadas||[]).map(p=>[p.res,p.bruto,p.tara,p.taraPend?1:0,p.uni].join(":")).join(",")].join("|"); }
+async function bajaDia(fecha){
+  const j=await getJ({action:"hojas",sede:CFG.PLANTA,fecha});
+  if(!j||!j.ok) return false;
+  let cambio=false;
+  for(const r of j.hojas){
+    const loc=HOJAS.find(h=>h.id===r.id);
+    if(loc&&(dirty(loc)||(H&&H.id===loc.id))) continue;                 // lo local pendiente o abierto en pantalla no se pisa
+    const n=r.pesadas.length, base=Date.now();
+    const h={id:r.id,puerta:r.puerta,fecha:r.fecha,placa:normPlaca(r.placa),viaje:vj(r.viaje),responsable:r.responsable,usuario:r.usuario,estado:r.estado==="cerrada"?"cerrada":"abierta",
+      pesadas:r.pesadas.map((p,i)=>({key:p.cod?String(p.cod):"n:"+fold(p.res),cod:p.cod,res:p.res,cat:p.cat,bruto:+p.bruto,tara:p.taraPend?null:(p.tara===""?0:+p.tara),taraPend:!!p.taraPend,uni:p.uni||"",tu:p.tu||"",ts:(loc&&loc.pesadas[i]&&loc.pesadas[i].ts)||(base-(n-i)*1000)})),
+      creado:loc?loc.creado:base,rev:loc?loc.rev||0:0,sync:loc?loc.rev||0:0,act:loc?loc.act:0};
+    if(loc&&firmaH(loc)===firmaH(h)){ loc.usuario=h.usuario; continue; }
+    if(loc) HOJAS[HOJAS.indexOf(loc)]=h; else HOJAS.push(h);
+    await DB.put(h); cambio=true;
+  }
+  (j.despachos||[]).forEach(d=>{ marcaAprob(fecha,d.placa,d.estado==="Aprobado",d.viaje); if(d.empresa&&d.conductor){ vehSet(dkey(fecha,d.placa,d.viaje),d); vehsPut(normPlaca(d.placa),d); } });
+  if(cambio||j.despachos&&j.despachos.length){ drawHojas(); drawVeh(); }
+  return true;
+}
+async function bajaVehiculos(){
+  const j=await getJ({action:"vehiculos"}); if(!j||!j.ok) return;
+  const m=LS.get(VEHS,{}); (j.vehiculos||[]).forEach(v=>{ m[normPlaca(v.placa)]={empresa:v.empresa,conductor:v.conductor,brevete:v.brevete||""}; }); LS.set(VEHS,m); drawVeh();
+}
+function refrescaDia(){
+  if(!CFG.SCRIPT_URL||!navigator.onLine||(AUTH&&!SES)||(SES&&SES.cambiar)) return Promise.resolve();
+  if(bajando) return bajando;
+  bajando=(async()=>{ try{ if(syncing) await syncing; const fs=[...new Set([todayStr(),$("#n-fecha").value].filter(Boolean))]; for(const f of fs) await bajaDia(f); await bajaVehiculos(); }catch(e){} })().then(()=>{ bajando=null; });
+  return bajando;
+}
 async function saveHoja(h){ h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
 
 /* ---------- sincronización con Google Sheets ---------- */
@@ -601,6 +654,8 @@ function drawQueue(){
   const show = CFG.SCRIPT_URL && n;
   c.classList.toggle("hidden",!show);
   c.textContent = show?`⏳ ${n} por enviar`:"";
+  const w=$("#q-warn"); w.classList.toggle("hidden",!show);
+  if(show) $("#q-txt").textContent=`⏳ ${n} registro${n>1?"s":""} sin enviar al Google Sheet. ${navigator.onLine?"Enviando…":"Se enviarán al recuperar la señal."} No borre los datos del navegador ni cierre sesión hasta que desaparezca este aviso.`;
 }
 function drawNet(){ const c=$("#chip-net"); const on=navigator.onLine; c.classList.toggle("off",!on); $("span",c).textContent=on?"Con conexión":"Sin conexión"; }
 
@@ -612,6 +667,7 @@ let TAB="hoja";
 function showView(){
   if(TAB==="usr"&&!can("usuarios")) TAB="hoja";
   if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
+  if(TAB==="act"&&!can("actividad")) TAB="hoja";
   const inHoja = TAB==="hoja" && H;
   if(inHoja) drawHoja();
   $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
@@ -619,6 +675,7 @@ function showView(){
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
   $("#v-usr").classList.toggle("hidden",TAB!=="usr");
   $("#v-cat").classList.toggle("hidden",TAB!=="cat");
+  $("#v-act").classList.toggle("hidden",TAB!=="act");
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
   window.scrollTo(0,0);
@@ -640,13 +697,25 @@ function drawHome(){
   $("#n-fecha").max=todayStr();
   drawUser();
   if(!AUTH&&!$("#n-resp").value) $("#n-resp").value=LS.get("pesaje.resp","");
-  if(!$("#n-placa").value) $("#n-placa").value=LS.get("pesaje.placa","");
   drawHojas();
+  drawVeh();
 }
 function openNew(v){ $("#n-card").classList.toggle("open",v===undefined?!$("#n-card").classList.contains("open"):!!v); if($("#n-card").classList.contains("open")) syncVeh(); }
 // los datos del vehículo se piden de entrada; solo se ocultan si el viaje vigente de esa placa y fecha ya los tiene
+// vehículos habituales (placa → empresa, conductor, brevete): vienen del servidor y de lo capturado en este equipo
+const VEHS="pesaje.vehs";
+function vehsGet(placa){ return LS.get(VEHS,{})[placa]||null; }
+function vehsPut(placa,d){ if(!placa||!d||!d.empresa||!d.conductor) return; const m=LS.get(VEHS,{}); m[placa]={empresa:d.empresa,conductor:d.conductor,brevete:d.brevete||""}; LS.set(VEHS,m); }
+function autoFill(id,val){ const el=$(id); if(!el.value||el.dataset.auto==="1"){ el.value=val||""; el.dataset.auto=val?"1":"0"; } }
+function drawVeh(){
+  const f=$("#n-fecha").value, hs=HOJAS.filter(h=>h.fecha===f).sort((a,b)=>(b.creado||0)-(a.creado||0)), pl=[...new Set(hs.map(h=>normPlaca(h.placa)))];
+  const box=$("#n-vh"); box.classList.toggle("hidden",!pl.length);
+  box.innerHTML=pl.length?`<span class="vl">Vehículos de esta fecha:</span>`+pl.map(x=>`<button type="button" data-vh="${esc(x)}">${esc(x)}</button>`).join(""):"";
+  $("#dl-cond").innerHTML=[...new Set(Object.values(LS.get(VEHS,{})).map(v=>v.conductor))].map(c=>`<option value="${esc(c)}">`).join("");
+}
 function syncVeh(){
   const fecha=$("#n-fecha").value, placa=normPlaca($("#n-placa").value), box=$("#n-veh");
+  drawVeh();
   let ya=false, dv=null, vv=1;
   if(fecha&&placa.length>=5){
     vv=Math.max(1,...HOJAS.filter(h=>h.fecha===fecha&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje)));
@@ -657,7 +726,9 @@ function syncVeh(){
   if(ya) my.textContent="✓ Datos del vehículo ya registrados para este viaje ("+dv.empresa+" · "+dv.conductor+(dv.brevete?" · "+dv.brevete:"")+"). No se piden de nuevo.";
   if(!ya){
     if(!$("#n-hora").value) $("#n-hora").value=horaAhora();
-    const ult=placa?LS.get("pesaje.vehult",{})[placa]:null; if(ult&&!$("#n-emp").value) $("#n-emp").value=ult.empresa||"";
+    const h=placa?vehsGet(placa):null;
+    if(h){ autoFill("#n-emp",h.empresa); autoFill("#n-cond",h.conductor); autoFill("#n-brev",h.brevete); }
+    else if(placa.length<5){ ["#n-emp","#n-cond","#n-brev"].forEach(i=>autoFill(i,"")); }
   }
 }
 function drawHojas(){
@@ -698,7 +769,7 @@ function drawHojas(){
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
       <div class="pchs">${chips}</div>
-      <div class="dfoot"><button class="btn sm" data-gdesp="${g.fecha}|${esc(g.placa)}|${g.viaje}">Ver despacho</button></div></div>`;
+      <div class="dfoot">${(()=>{ const cz=ap?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}<button class="btn sm" data-gdesp="${g.fecha}|${esc(g.placa)}|${g.viaje}">Ver despacho</button></div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
   const hoyG=ord.filter(g=>g.fecha===hoy), antG=ord.filter(g=>g.fecha!==hoy).slice(0,12);
@@ -740,7 +811,7 @@ async function startHoja(viajeFijo){
     const box=$("#n-veh");
     if(box.classList.contains("hidden")){
       box.classList.remove("hidden"); if(!$("#n-hora").value) $("#n-hora").value=horaAhora();
-      const ult=LS.get("pesaje.vehult",{})[placa]; if(ult){ if(!$("#n-emp").value) $("#n-emp").value=ult.empresa||""; }
+      const hb=vehsGet(placa); if(hb){ autoFill("#n-emp",hb.empresa); autoFill("#n-cond",hb.conductor); autoFill("#n-brev",hb.brevete); }
       return void(e.textContent="Complete los datos del vehículo para iniciar el pesaje.");
     }
     const d={empresa:$("#n-emp").value.trim(),conductor:$("#n-cond").value.trim().replace(/\s+/g," "),brevete:$("#n-brev").value.trim().toUpperCase(),hora:$("#n-hora").value};
@@ -748,12 +819,12 @@ async function startHoja(viajeFijo){
     if(!d.conductor) return void(e.textContent="Ingrese el conductor.");
     if(!d.brevete) return void(e.textContent="Ingrese el brevete.");
     if(!d.hora) return void(e.textContent="Ingrese la hora de llegada.");
-    vehSet(kV,d); const ul=LS.get("pesaje.vehult",{}); ul[placa]={empresa:d.empresa}; LS.set("pesaje.vehult",ul);
+    vehSet(kV,d); vehsPut(placa,d);
     const q=LS.get(DESPQ,{}); q[kV]={key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje:v,empresa:d.empresa,conductor:d.conductor,brevete:d.brevete,hora:d.hora,manejoNP:"",manejoP:"",obs:""}; LS.set(DESPQ,q);
   }
   const h={id:uuid(),puerta,fecha,placa,viaje:v,responsable:resp,usuario:AUTH&&SES?SES.usuario:"",estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
   if(v>1) toast("Viaje "+v+" iniciado.");
-  HOJAS.push(h); await saveHoja(h); ["#n-cond","#n-brev","#n-hora"].forEach(i=>$(i).value=""); ["#n-emp"].forEach(i=>$(i).value=""); if(AUTH&&SES) $("#n-resp").value=SES.nombre; openNew(false); openHoja(h.id);
+  HOJAS.push(h); await saveHoja(h); ["#n-emp","#n-cond","#n-brev","#n-hora"].forEach(i=>{ $(i).value=""; $(i).dataset.auto="0"; }); if(AUTH&&SES) $("#n-resp").value=SES.nombre; openNew(false); openHoja(h.id);
   sync();
 }
 function openHoja(id){
@@ -806,6 +877,12 @@ function drawHoja(){
   const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap);
 }
 
+async function cerrarGrupo(f,pl,v){
+  const hs=HOJAS.filter(h=>h.fecha===f&&normPlaca(h.placa)===normPlaca(pl)&&vj(h.viaje)===v&&h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)&&!aprobada(h));
+  if(!hs.length) return toast("No hay hojas abiertas para cerrar.");
+  for(const h of hs){ h.estado="cerrada"; await saveHoja(h); }
+  drawHojas(); toast(hs.length+" hoja"+(hs.length>1?"s":"")+" cerrada"+(hs.length>1?"s":"")+(navigator.onLine?". Enviando…":". Se enviarán cuando haya señal."));
+}
 async function cerrarOReabrir(){
   if(ajena(H)) return toast("Hoja de "+H.responsable+": solo puede modificarla su autor o un Inspector.");
   if(aprobada(H)) return toast("Despacho aprobado: edición bloqueada.");
@@ -1208,6 +1285,7 @@ function drawUser(){
   if(AUTH&&SES) c.textContent="👤 "+SES.nombre.split(" ")[0];
   $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
   $("#tab-cat").classList.toggle("hidden",!can("catalogo")||!AUTH);
+  $("#tab-act").classList.toggle("hidden",!can("actividad")||!AUTH);
   const r=$("#n-resp"); if(AUTH&&SES&&SES.rol!=="Administrador"){ r.value=SES.nombre; r.readOnly=true; } else { r.readOnly=false; if(AUTH&&SES&&!r.value) r.value=SES.nombre; }   // el Administrador puede registrar a nombre de otra persona
 }
 function showLogin(msg){
@@ -1229,7 +1307,7 @@ async function doLogin(ev){
     if(!j||!j.ok) return void(e.textContent=ERR_LOGIN[j&&j.error]||"No se pudo ingresar ("+((j&&j.error)||"error")+").");
     setSes(j); $("#login").classList.add("hidden"); $("#lg-p").value="";
     drawUser(); drawHome(); showView();
-    if(SES.cambiar) openCta(true); else { sync(); cargaCatalogo(); }
+    if(SES.cambiar) openCta(true); else { sync(); cargaCatalogo(); refrescaDia(); }
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
   finally{ b.disabled=false; b.textContent="Ingresar"; }
 }
@@ -1277,6 +1355,16 @@ async function drawUsuarios(){
       <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
   }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
 }
+async function drawActividad(){
+  const L=$("#a-list");
+  if(!navigator.onLine) return void(L.textContent="Requiere conexión con el Google Sheet.");
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"actividad_listar"},30000);
+    if(!j||!j.ok) return void(L.textContent="No se pudo cargar ("+((j&&j.error)||"error")+").");
+    const fh=t=>{ const d=new Date(t); return isNaN(d)?esc(String(t)):new Intl.DateTimeFormat("es-PE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:CFG.ZONA_HORARIA}).format(d); };
+    L.innerHTML=j.filas.map(f=>`<div class="arow"><b>${esc(f.accion)}</b>${esc(f.detalle)}<div class="muted">${fh(f.fecha)} · ${esc(f.usuario)} (${esc(f.rol)})</div></div>`).join("")||"Sin movimientos todavía.";
+  }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
+}
 async function usrOp(body,okMsg){
   try{ const j=await postJ(Object.assign({key:CFG.CLAVE},body),30000);
     if(j&&j.ok){ if(okMsg) toast(okMsg); await drawUsuarios(); return true; }
@@ -1289,17 +1377,20 @@ async function crearUsuario(){
   if(nombre.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido.");
   if(!/^[a-z0-9._]{3,30}$/.test(usuario)) return void(e.textContent=ERR_USR.usuario_invalido);
   if(clave.length<8) return void(e.textContent=ERR_USR.clave_corta);
-  const j=await postJ({key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave},30000).catch(()=>null);
+  const j=await postJ({key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave,cambiar:$("#u-cambiar").checked},30000).catch(()=>null);
   if(!j) return void(e.textContent="Sin conexión con el Google Sheet.");
   if(!j.ok) return void(e.textContent=ERR_USR[j.error]||"No se pudo crear ("+j.error+").");
-  alert("Perfil creado.\nUsuario: "+usuario+"\nContraseña temporal: "+clave+"\nEntréguela a la persona: deberá cambiarla al ingresar.");
+  alert("Perfil creado.\nUsuario: "+usuario+"\nContraseña temporal: "+clave+"\nEntréguela a la persona: "+($("#u-cambiar").checked?"deberá cambiarla al ingresar.":"podrá seguir usándola (puede cambiarla desde su cuenta)."));
   $("#u-nom").value=""; $("#u-usr").value=""; $("#u-clv").value=claveAzar(); drawUsuarios();
 }
 
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value) $("#d-placa").value=H?H.placa:LS.get("pesaje.placa",""); if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); showView(); return; }
+  const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
+  if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
+  const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value&&H) $("#d-placa").value=H.placa; if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
@@ -1354,12 +1445,15 @@ $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefa
 $("#d-go").addEventListener("click",consultarDespacho);
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); viajeOk=null; syncVeh(); });
 $("#n-fecha").addEventListener("change",syncVeh);
+["#n-emp","#n-cond","#n-brev"].forEach(i=>$(i).addEventListener("input",()=>{ $(i).dataset.auto="0"; }));
+$("#n-cond").addEventListener("change",e=>{ const c=e.target.value.trim().toLowerCase(), v=Object.values(LS.get(VEHS,{})).find(x=>x.conductor.toLowerCase()===c); if(v&&!$("#n-brev").value) { $("#n-brev").value=v.brevete||""; $("#n-brev").dataset.auto="1"; } });
 $("#d-fecha").addEventListener("change",dlDesp);
 $("#d-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); });
 $("#chip-q").addEventListener("click",()=>{ toast("Sincronizando…"); sync(); });
-window.addEventListener("online",()=>{ drawNet(); if(!AUTH||SES){ sync(); cargaCatalogo(); } });
+window.addEventListener("online",()=>{ drawNet(); if(!AUTH||SES){ sync(); cargaCatalogo(); refrescaDia(); } drawQueue(); });
 window.addEventListener("offline",()=>{ drawNet(); ACS.forEach(a=>a.abort()); });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); } });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ drawNet(); sync(); refrescaDia(); } });
+setInterval(()=>{ if(!document.hidden) refrescaDia(); },30000);
 setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(DESPQ,{})).length)) sync(); },45000);
 
 /* ---------- arranque ---------- */
@@ -1368,7 +1462,8 @@ setInterval(()=>{ if(navigator.onLine && (HOJAS.some(dirty)||Object.keys(LS.get(
   HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
   drawNet(); drawHome(); showView();
   if(AUTH&&!SES) showLogin(); else if(SES&&SES.cambiar) openCta(true);
-  if(navigator.onLine&&(!AUTH||SES)){ sync(); cargaCatalogo(); }
+  if(navigator.onLine&&(!AUTH||SES)){ sync(); cargaCatalogo(); refrescaDia(); }
+  try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if("serviceWorker" in navigator && location.protocol!=="file:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
 </script>
