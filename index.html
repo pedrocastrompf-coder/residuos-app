@@ -347,15 +347,16 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     <div class="noprint" id="d-list"></div>
     <details class="card noprint" id="d-consult">
       <summary style="cursor:pointer;font-weight:700;color:var(--brown)">Buscar despacho de otro día</summary>
-      <div class="muted" style="margin-top:6px">Consolida las hojas de todas las puertas con la misma fecha y placa (formato SGA.R.G.001).</div>
+      <div class="muted" style="margin-top:6px">Elija la fecha y verá los despachos de ese día. La placa y el viaje son opcionales: sirven solo para acotar la búsqueda.</div>
       <div class="row2">
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
-        <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
+        <div><label class="f" for="d-placa">Placa <span class="muted">(opcional)</span></label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
       </div>
-      <div style="width:calc(50% - 6px)"><label class="f" for="d-viaje">Viaje <span class="muted">(1 = primera salida del día; si el mismo vehículo sale otra vez, es el viaje 2)</span></label><input id="d-viaje" type="number" inputmode="numeric" min="1" step="1" value="1" class="in"></div>
+      <div style="width:calc(50% - 6px)"><label class="f" for="d-viaje">Viaje <span class="muted">(opcional)</span></label><input id="d-viaje" type="number" inputmode="numeric" min="1" step="1" placeholder="Todos" class="in"></div>
       <div style="height:10px"></div>
       <button class="btn" id="d-go">Consultar</button>
       <div class="err" id="d-err"></div>
+      <div id="d-res"></div>
     </details>
     <div id="d-out"></div>
   </section>
@@ -468,7 +469,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     <div class="muted" id="cta-i"></div>
     <label class="f" for="cta-a">Contraseña actual</label>
     <input id="cta-a" class="in" type="password" autocomplete="current-password">
-    <label class="f" for="cta-n">Contraseña nueva (mínimo 8 caracteres)</label>
+    <label class="f" for="cta-n">Contraseña nueva (mínimo 4 caracteres)</label>
     <input id="cta-n" class="in" type="password" autocomplete="new-password">
     <label class="f" for="cta-r">Repetir contraseña nueva</label>
     <input id="cta-r" class="in" type="password" autocomplete="new-password">
@@ -688,11 +689,22 @@ function sync(){
   });
   return syncing;
 }
+function msgAjena(h){ return "Esta hoja la abrió la cuenta «"+(h.usuario||h.responsable)+"». Solo esa cuenta o un Inspector puede modificarla."; }
+function estadoHoja(){   // Operador: dice con claridad si lo pesado ya está a salvo
+  if(!H||!SIMPLE()) return;
+  const pend=dirty(H)&&CFG.SCRIPT_URL; let t="";
+  if(aprobada(H)) t="🔒 Despacho aprobado: solo lectura";
+  else if(ajena(H)) t="Solo lectura. "+msgAjena(H);
+  else if(H.estado==="cerrada") t=pend?"Puerta terminada. "+(navigator.onLine?"Enviando…":"Se enviará cuando haya señal."):"✓ Puerta terminada y enviada. Toque «Reabrir hoja» para agregar pesadas.";
+  else if(H.pesadas.length) t=pend?(navigator.onLine?"Guardado en este equipo · enviando…":"Guardado en este equipo · se enviará cuando haya señal"):"✓ Guardado y enviado";
+  const el=$("#hh-l2"); el.textContent=t; el.classList.toggle("hidden",!t);
+}
 function drawQueue(){
   const n=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length, c=$("#chip-q");
   const show = CFG.SCRIPT_URL && n;
   c.classList.toggle("hidden",!show);
   c.textContent = show?`⏳ ${n} por enviar`:"";
+  estadoHoja();
   const w=$("#q-warn"); w.classList.toggle("hidden",!show);
   if(show) $("#q-txt").textContent=`⏳ ${n} registro${n>1?"s":""} sin enviar al Google Sheet. ${navigator.onLine?"Enviando…":"Se enviarán al recuperar la señal."} No borre los datos del navegador ni cierre sesión hasta que desaparezca este aviso.`;
 }
@@ -780,7 +792,8 @@ function drawHojas(){
   HOJAS.forEach(h=>{ const pl=normPlaca(h.placa), k=h.fecha+"|"+pl+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{fecha:h.fecha,placa:pl,viaje:vj(h.viaje),hojas:[],ts:0}); const g=G.get(k); g.hojas.push(h); g.ts=Math.max(g.ts,h.creado||0); });
   const all=[...G.values()];
   const kgHoy=r2(HOJAS.filter(h=>h.fecha===hoy).reduce((a,h)=>a+kgHoja(h),0));
-  const porAprobar=all.filter(g=>!aprobada(g.hojas[0])&&g.hojas.some(h=>(h.pesadas||[]).length)&&g.hojas.every(h=>h.estado==="cerrada")).length;
+  const conDatos=h=>(h.pesadas||[]).length>0;   // una hoja abierta sin pesadas no tiene nada que cerrar: no bloquea el despacho
+  const porAprobar=all.filter(g=>!aprobada(g.hojas[0])&&g.hojas.some(conDatos)&&g.hojas.filter(conDatos).every(h=>h.estado==="cerrada")).length;
   const abiertas=HOJAS.filter(h=>h.estado!=="cerrada"&&!aprobada(h)).length;
   const aprobHoy=all.filter(g=>g.fecha===hoy&&aprobada(g.hojas[0])).length;
   $("#kpis").innerHTML=`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div>
@@ -790,7 +803,7 @@ function drawHojas(){
     <div class="kpi"><div class="l">Aprobados hoy</div><div class="n">${aprobHoy}</div></div>`;
   const multi=g=>g.viaje>1||all.some(x=>x.fecha===g.fecha&&x.placa===g.placa&&x.viaje>1);
   const tit=g=>esc(g.placa)+(multi(g)?` · Viaje ${g.viaje}`:"");
-  const estado=g=>{ const ap=aprobada(g.hojas[0]), todasCerr=g.hojas.every(h=>h.estado==="cerrada");
+  const estado=g=>{ const ap=aprobada(g.hojas[0]), todasCerr=g.hojas.filter(conDatos).every(h=>h.estado==="cerrada");
     return ap?`<span class="bdg ap">🔒 aprobado</span>`:todasCerr?`<span class="bdg ce">listo para aprobar</span>`:`<span class="bdg ab">en curso</span>`; };
   const kgG=g=>r2(g.hojas.reduce((a,h)=>a+kgHoja(h),0));
   const hojaRow=h=>`<button class="hrow" data-open="${h.id}">
@@ -805,7 +818,7 @@ function drawHojas(){
   /* Inspector: resumen de lo pesado en el vehículo, por puerta y por tipo de residuo */
   const svDetalle=g=>{
     const rows=g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(h=>{ const ap=aprobada(h);
-      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b><div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
+      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b>${!ap&&can("borrarHoja")&&!(h.pesadas||[]).length&&!h.sync?` <span class="xh" data-delh="${h.id}">✕ eliminar</span>`:""}${!ap&&h.estado!=="cerrada"&&(h.pesadas||[]).length?` <button class="btn sec sm" data-svcerrar="${h.id}">Cerrar hoja</button>`:""}<div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
     const M=new Map(); g.hojas.forEach(h=>(h.pesadas||[]).forEach(p=>M.set(p.cat||"Sin tipo",r2((M.get(p.cat||"Sin tipo")||0)+netoDe(p)))));
     const cats=[...M.entries()].sort((a,b)=>b[1]-a[1]).map(([c,k])=>`<span>${esc(c)} <b>${fmt(k)} kg</b></span>`).join("");
     return `<div class="sv">${rows}${cats?`<div class="cats">${cats}</div>`:""}</div>`;
@@ -823,7 +836,7 @@ function drawHojas(){
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
       ${SUPERV()?svDetalle(g):""}<div class="pchs">${chips}</div>
-      <div class="dfoot">${(()=>{ const cz=ap||SUPERV()?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.every(h=>h.estado==="cerrada")&&g.hojas.some(h=>(h.pesadas||[]).length);
+      <div class="dfoot">${(()=>{ const cz=ap||SUPERV()?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.filter(conDatos).every(h=>h.estado==="cerrada")&&g.hojas.some(conDatos);
         return ap?`<button class="btn sm" data-gdesp="${k}">Ver despacho</button>`:listo?`<button class="btn sm" data-gdesp="${k}">Generar despacho</button>`:`<button class="btn sm" disabled style="opacity:.5">Generar despacho</button><div class="muted" style="width:100%;text-align:right;font-size:11.5px">Cierre las hojas abiertas para generarlo.</div>`; })()}</div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
@@ -931,18 +944,18 @@ function drawOp(){
       <div class="muted" style="text-align:center;margin-top:8px">Al terminar, sus hojas se cierran y se envían.</div>`;
     return;
   }
-  box.innerHTML=`<button class="btn xl" data-op="nuevo" style="margin-top:6px">＋ Llegó un camión</button>
+  box.innerHTML=`<button class="btn xl" data-op="nuevo" style="margin-top:6px">＋ Iniciar despacho</button>
     <div class="opt">Camiones en curso</div>`+
-    (lista.length?lista.map(c=>{ const d=c.d||{}, hs=c.hojas, listo=hs.length&&hs.every(h=>h.estado==="cerrada");
+    (lista.length?lista.map(c=>{ const d=c.d||{}, hs=c.hojas, listo=hs.some(h=>(h.pesadas||[]).length)&&hs.filter(h=>(h.pesadas||[]).length).every(h=>h.estado==="cerrada");
       return `<button class="tk ${listo?"done":""}" data-tk="${esc(c.k)}"><div class="p">${esc(c.placa)}${c.viaje>1?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}${listo?`<span class="bdg ap">terminado</span>`:""}</div>
         <div class="m">${esc(d.empresa||"")}</div><div class="m"><b>${atiendeTxt(c)}</b></div><div class="pchs">${chipsPuertas(c)}</div></button>`; }).join("")
-      :`<div class="card muted">No hay camiones en curso. Cuando llegue uno, toque «Llegó un camión».</div>`);
+      :`<div class="card muted">No hay camiones en curso. Cuando llegue uno, toque «Iniciar despacho».</div>`);
 }
 function drawOpNuevo(){
   OP={v:"nuevo",k:null};
   const placas=[...new Set(CFG.PLACAS.concat(Object.keys(LS.get(VEHS,{}))))];
   $("#op-body").innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
-    <div class="card opf"><h2>Llegó un camión</h2>
+    <div class="card opf"><h2>Iniciar despacho</h2>
       <label class="f" for="op-placa">Placa del vehículo</label>
       <input id="op-placa" class="in placa" list="dl-op" autocapitalize="characters" autocomplete="off" placeholder="ABZ-937"><datalist id="dl-op">${placas.map(p=>`<option value="${esc(p)}">`).join("")}</datalist>
       <div class="vehya hidden" id="op-ya"></div>
@@ -990,7 +1003,11 @@ async function opSeguir(){
   drawQueue(); sync();
   OP={v:"camion",k:hoy+"|"+placa+"|"+v}; if(v>1) toast("Viaje "+v+" iniciado."); drawOp();
 }
+let OPBUSY=false;
 async function opPuerta(puerta){
+  if(OPBUSY) return; OPBUSY=true; try{ await opPuerta_(puerta); } finally{ OPBUSY=false; }
+}
+async function opPuerta_(puerta){
   const c=camionesHoy().find(x=>x.k===OP.k); if(!c) return;
   const ex=hojaDe(c,puerta); if(ex) return openHoja(ex.id);
   await refrescaAprob({fecha:todayStr(),placa:c.placa,viaje:c.viaje});
@@ -1014,8 +1031,8 @@ function drawHoja(){
   const ap = aprobada(H), ro = H.estado==="cerrada"||ap||ajena(H);
   const S=SIMPLE(), multiV=(vj(H.viaje)>1||HOJAS.some(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)>1));
   $("#hh-l1").textContent=S?`${H.placa} · ${H.puerta}`+(multiV?` · Viaje ${vj(H.viaje)}`:""):`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`+(multiV?` · Viaje ${vj(H.viaje)}`:"");
-  $("#hh-l2").textContent=S?(ap?"🔒 Despacho aprobado: solo lectura":ajena(H)?`Solo lectura: hoja de ${H.responsable}`:H.estado==="cerrada"?"Hoja cerrada. Toque «Reabrir hoja» para agregar pesadas.":""):`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":ajena(H)?" · solo lectura (hoja de otro usuario)":H.estado==="cerrada"?" · hoja cerrada":""}`;
-  $("#hh-l2").classList.toggle("hidden",S&&!$("#hh-l2").textContent);
+  $("#hh-l2").textContent=S?"":`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":ajena(H)?" · solo lectura (hoja de otro usuario)":H.estado==="cerrada"?" · hoja cerrada":""}`;
+  if(S) estadoHoja(); else $("#hh-l2").classList.remove("hidden");
   $("#q").classList.toggle("hidden",S&&!OPSRCH&&!$("#q").value);
   $("#hh-kg").textContent=fmt(kgHoja(H));
   const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
@@ -1030,7 +1047,7 @@ function drawHoja(){
     const t=totales(H,x.key);
     return `<button class="rrow ${t.pend?"pend":t.n?"has":""}" data-k="${esc(x.key)}">
       <div class="n">${esc(x.name)}<small>${x.pel?"⚠ peligroso · ":""}${x.cod?"SAP "+x.cod:"sin código SAP"}</small></div>
-      <div class="v">${t.n?`<b>${fmt(t.kg)}</b> kg<small>${t.n} pesada${t.n>1?"s":""}${uniTxt(t.uni)?" · "+uniTxt(t.uni):""}</small>`:`<span class="muted">+ pesar</span>`}</div></button>`;
+      <div class="v">${t.n?`<b>${fmt(t.kg)}</b> kg<small>${t.n} pesada${t.n>1?"s":""}${uniTxt(t.uni)?" · "+uniTxt(t.uni):""}</small>`:`<span class="muted">${S&&ro?"":"+ pesar"}</span>`}</div></button>`;
   };
   // residuos ya pesados en esta hoja: arriba, el último pesado primero
   const last=new Map();
@@ -1055,7 +1072,7 @@ function drawHoja(){
     return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
   }).join("")+`</div>`;
   $("#lista").innerHTML = html || `<div class="card muted">Sin resultados.</div>`;
-  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(H.estado!=="cerrada"||ajena(H))));
+  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":(S?"✓ Terminé esta puerta":"Cerrar hoja y enviar"); b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(ajena(H)||(H.estado!=="cerrada"&&!H.pesadas.length))));
   $("#b-back").textContent=S?"← Volver al camión":"← Hojas";
 }
 
@@ -1066,13 +1083,15 @@ async function cerrarGrupo(f,pl,v){
   drawHojas(); toast(hs.length+" hoja"+(hs.length>1?"s":"")+" cerrada"+(hs.length>1?"s":"")+(navigator.onLine?". Enviando…":". Se enviarán cuando haya señal."));
 }
 async function cerrarOReabrir(){
-  if(ajena(H)) return toast("Hoja de "+H.responsable+": solo puede modificarla su autor o un Inspector.");
+  if(ajena(H)) return toast(msgAjena(H));
   if(aprobada(H)) return toast("Despacho aprobado: edición bloqueada.");
   if(H.estado==="cerrada"){ H.estado="abierta"; await saveHoja(H); drawHoja(); return toast("Hoja reabierta."); }
   if(!H.pesadas.length) return toast("La hoja no tiene pesadas registradas.");
   const pend=pendHoja(H);
   if(pend) return toast(`Completa la tara de ${pend} pesada${pend>1?"s":""} antes de cerrar.`);
-  H.estado="cerrada"; await saveHoja(H); drawHoja();
+  H.estado="cerrada"; await saveHoja(H);
+  if(SIMPLE()){ OP={v:"camion",k:dkOp(H)}; OPSRCH=false; H=null; showView(); return toast("Puerta terminada."+(navigator.onLine?" Enviando…":" Se enviará cuando haya señal.")); }
+  drawHoja();
   toast(CFG.SCRIPT_URL?(navigator.onLine?"Hoja cerrada. Enviando…":"Hoja cerrada. Se enviará cuando haya señal."):"Hoja cerrada (modo local: falta conectar la hoja de Google).");
 }
 
@@ -1093,7 +1112,7 @@ function rememberTara(v){
 }
 function openSheet(key){
   CUR=CATBY.get(key); if(!CUR) return;
-  if(ajena(H)) return toast("Hoja de "+H.responsable+": solo puede modificarla su autor o un Inspector.");
+  if(ajena(H)) return toast(msgAjena(H));
   if(aprobada(H)) return toast("Despacho aprobado: solo lectura. Para corregir, solicitar la reapertura.");
   if(H.estado==="cerrada") return toast("Hoja cerrada. Reabrir para editar.");
   EDIT=null;
@@ -1196,10 +1215,26 @@ function buildDespacho(hojas){
   filas.forEach(r=>r.total=r2(Object.values(r.pp).reduce((a,b)=>a+b,0)));
   return {porPuerta,filas};
 }
+/* búsqueda por fecha (placa y viaje opcionales): lista los despachos de ese día */
+async function buscarDespachos(){
+  const fecha=$("#d-fecha").value, pl=normPlaca($("#d-placa").value), vtxt=$("#d-viaje").value.trim(), e=$("#d-err"), R=$("#d-res"); e.textContent=""; R.innerHTML="";
+  if(!fecha) return void(e.textContent="Seleccione la fecha.");
+  if(pl.length>=5&&vtxt) return consultarDespacho();           // sabe todo: abre directo
+  if(CFG.SCRIPT_URL&&navigator.onLine){ try{ await bajaDia(fecha); }catch(x){} }
+  const G=new Map();
+  HOJAS.filter(h=>h.fecha===fecha&&(!pl||normPlaca(h.placa).includes(pl))&&(!vtxt||vj(h.viaje)===vj(vtxt))).forEach(h=>{ const p=normPlaca(h.placa), k=p+"|"+vj(h.viaje); if(!G.has(k)) G.set(k,{placa:p,viaje:vj(h.viaje),hojas:[]}); G.get(k).hojas.push(h); });
+  const gs=[...G.values()].sort((a,b)=>a.placa<b.placa?-1:a.placa>b.placa?1:a.viaje-b.viaje);
+  if(!gs.length) return void(e.textContent="No hay despachos"+(pl?" de esa placa":"")+" en esa fecha.");
+  if(gs.length===1){ $("#d-placa").value=gs[0].placa; $("#d-viaje").value=gs[0].viaje; return consultarDespacho(); }
+  R.innerHTML=`<div class="muted" style="margin:10px 0 4px">${gs.length} despachos el ${esc(fecha)}. Toque uno para abrirlo:</div>`+gs.map(g=>{
+    const kg=r2(g.hojas.reduce((a,h)=>a+kgHoja(h),0)), ap=aprobada(g.hojas[0]);
+    return `<div class="sv"><div class="r" data-gdesp="${esc(fecha)}|${esc(g.placa)}|${g.viaje}" style="cursor:pointer"><div><b>${esc(g.placa)}</b> · Viaje ${g.viaje}<div class="muted">${g.hojas.length} puerta(s)</div></div><div style="text-align:right"><b>${fmt(kg)} kg</b><div class="muted">${ap?"Aprobado":"Pendiente"}</div></div></div></div>`;
+  }).join("");
+}
 async function consultarDespacho(){
   const fecha=$("#d-fecha").value, placa=normPlaca($("#d-placa").value), viaje=vj($("#d-viaje").value), e=$("#d-err"); e.textContent="";
   $("#d-viaje").value=viaje; DVIAJE=viaje;
-  if(!fecha||placa.length<5) return void(e.textContent="Seleccione la fecha e ingrese la placa.");
+  if(!fecha||placa.length<5) return void(e.textContent="Seleccione la fecha e ingrese la placa.");   // (se llega aquí con placa completa y viaje)
   let hojas=[], origen="Solo hojas de este equipo"; DSRV=null;
   if(CFG.SCRIPT_URL && navigator.onLine){
     try{
@@ -1219,7 +1254,7 @@ async function consultarDespacho(){
 function officialHTML(fecha,placa,filas,tipoRes){
   const kg=new Map(filas.map(r=>[r.key,r.total]));
   const F=CFG.FORMATO||{};
-  const w=x=>{ const v=kg.get(x.key); return v?fmt(v):""; };
+  const w=x=>{ const v=kg.get(x.key); return v?fmt(v):"-"; };
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
       CAT.filter(x=>x.cat===c).map(x=>`<tr><td class="c">${x.cod||"-"}</td><td>${esc(x.name)}</td><td class="r">${w(x)}</td></tr>`).join("");
@@ -1368,7 +1403,7 @@ async function aprobarDesp(){
   if(!navigator.onLine) return err("Requiere conexión con el Google Sheet.");
   const [fecha,placa,vv]=DKEY.split("|"), viaje=vj(vv);
   if(modo==="aprobar"){
-    const ab=DHOJAS.filter(h=>h.estado!=="cerrada").map(h=>h.puerta);
+    const ab=DHOJAS.filter(h=>h.estado!=="cerrada"&&(h.pesadas||[]).length).map(h=>h.puerta);
     if(ab.length) return err("Hay hojas abiertas ("+ab.join(", ")+"). Cerrarlas antes de aprobar.");
     const pend=DFILAS.reduce((a,r)=>a+r.pend,0);
     if(pend) return err("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Completarlas antes de aprobar.");
@@ -1507,7 +1542,7 @@ function openCta(forzar){
   ["cta-a","cta-n","cta-r"].forEach(i=>$("#"+i).value=""); $("#cta-err").textContent="";
   setTimeout(()=>$("#cta-a").focus(),50);
 }
-const ERR_CTA={clave_actual:"La contraseña actual no es correcta.",clave_corta:"La contraseña nueva debe tener entre 8 y 64 caracteres.",clave_igual:"La contraseña nueva debe ser distinta de la actual."};
+const ERR_CTA={clave_actual:"La contraseña actual no es correcta.",clave_corta:"La contraseña nueva debe tener entre 4 y 64 caracteres.",clave_igual:"La contraseña nueva debe ser distinta de la actual."};
 async function doCta(ev){
   ev.preventDefault(); const e=$("#cta-err"); e.textContent="";
   const a=$("#cta-a").value, n=$("#cta-n").value, r=$("#cta-r").value;
@@ -1525,7 +1560,7 @@ function cerrarSesion(){
   if(n&&!confirm("Hay "+n+" registro"+(n>1?"s":"")+" por enviar. Se enviarán cuando vuelva a iniciar sesión con conexión.\n¿Cerrar sesión?")) return;
   H=null; TAB="hoja"; OP={v:"inicio",k:null}; needLogin(); showView();
 }
-const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 8 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
+const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 4 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
 function claveAzar(){ const A="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>A[x%A.length]).join(""); }
 let USRS=[];
 async function drawUsuarios(){
@@ -1563,7 +1598,7 @@ async function crearUsuario(){
   const nombre=$("#u-nom").value.trim().replace(/\s+/g," "), usuario=$("#u-usr").value.trim().toLowerCase(), rol=$("#u-rol").value, clave=$("#u-clv").value;
   if(nombre.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido.");
   if(!/^[a-z0-9._]{3,30}$/.test(usuario)) return void(e.textContent=ERR_USR.usuario_invalido);
-  if(clave.length<8) return void(e.textContent=ERR_USR.clave_corta);
+  if(clave.length<4) return void(e.textContent=ERR_USR.clave_corta);
   const j=await postJ({key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave,cambiar:$("#u-cambiar").checked},30000).catch(()=>null);
   if(!j) return void(e.textContent="Sin conexión con el Google Sheet.");
   if(!j.ok) return void(e.textContent=ERR_USR[j.error]||"No se pudo crear ("+j.error+").");
@@ -1592,6 +1627,7 @@ document.addEventListener("click",e=>{
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
   const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho().then(()=>window.scrollTo({top:0})); return; }
   if(t.closest("#d-back")){ modoDetalle(false); drawHojas(); window.scrollTo({top:0}); return; }
+  const sc=t.closest("[data-svcerrar]"); if(sc){ const h=HOJAS.find(x=>x.id===sc.dataset.svcerrar); if(h&&h.estado!=="cerrada"&&confirm("¿Cerrar la hoja de "+h.puerta+" de "+h.responsable+"?\nSi esa persona sigue pesando, tendrá que reabrirla.")){ h.estado="cerrada"; saveHoja(h).then(()=>{ drawHojas(); toast("Hoja cerrada."); }); } return; }
   const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const cb=t.closest("[data-cb]"); if(cb){ OPENCB=OPENCB===cb.dataset.cb?null:cb.dataset.cb; drawCatList(); return; }
@@ -1638,7 +1674,7 @@ $("#f-bruto").addEventListener("input",drawPrev);
 $("#f-uni").addEventListener("input",drawPrev);
 $("#f-otra").addEventListener("input",()=>{ TARA={t:"val",v:num($("#f-otra").value)}; drawTaras(); drawPrev(); });
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
-$("#d-go").addEventListener("click",consultarDespacho);
+$("#d-go").addEventListener("click",buscarDespachos);
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); viajeOk=null; syncVeh(); });
 $("#n-fecha").addEventListener("change",syncVeh);
 ["#n-emp","#n-cond","#n-brev"].forEach(i=>$(i).addEventListener("input",()=>{ $(i).dataset.auto="0"; }));
