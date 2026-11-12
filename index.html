@@ -309,9 +309,9 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   <section id="v-desp" class="hidden">
     <div class="kpis noprint" id="d-kpis"></div>
     <div class="noprint" id="d-list"></div>
-    <div class="card noprint">
-      <h2>Consultar despacho</h2>
-      <div class="muted">Consolida las hojas de todas las puertas con la misma fecha y placa (formato SGA.R.G.001).</div>
+    <details class="card noprint" id="d-consult">
+      <summary style="cursor:pointer;font-weight:700;color:var(--brown)">Buscar despacho de otro día</summary>
+      <div class="muted" style="margin-top:6px">Consolida las hojas de todas las puertas con la misma fecha y placa (formato SGA.R.G.001).</div>
       <div class="row2">
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
         <div><label class="f" for="d-placa">Placa</label><input id="d-placa" class="in" list="dl-placas-d" autocapitalize="characters" autocomplete="off"></div>
@@ -320,7 +320,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       <div style="height:10px"></div>
       <button class="btn" id="d-go">Consultar</button>
       <div class="err" id="d-err"></div>
-    </div>
+    </details>
     <div id="d-out"></div>
   </section>
 
@@ -769,7 +769,8 @@ function drawHojas(){
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
       <div class="pchs">${chips}</div>
-      <div class="dfoot">${(()=>{ const cz=ap?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}<button class="btn sm" data-gdesp="${g.fecha}|${esc(g.placa)}|${g.viaje}">Ver despacho</button></div></div>`;
+      <div class="dfoot">${(()=>{ const cz=ap?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.every(h=>h.estado==="cerrada")&&g.hojas.some(h=>(h.pesadas||[]).length);
+        return ap?`<button class="btn sm" data-gdesp="${k}">Ver despacho</button>`:listo?`<button class="btn sm" data-gdesp="${k}">Generar despacho</button>`:`<button class="btn sm" disabled style="opacity:.5">Generar despacho</button><div class="muted" style="width:100%;text-align:right;font-size:11.5px">Cierre las hojas abiertas para generarlo.</div>`; })()}</div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
   const hoyG=ord.filter(g=>g.fecha===hoy), antG=ord.filter(g=>g.fecha!==hoy).slice(0,12);
@@ -1068,7 +1069,9 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
   </div>`;
 }
+function modoDetalle(on){ ["#d-kpis","#d-list","#d-consult"].forEach(i=>$(i).classList.toggle("hidden",on)); if(!on) $("#d-out").innerHTML=""; }
 function drawDespacho(fecha,placa,hojas,origen){
+  modoDetalle(true);
   const {porPuerta,filas}=buildDespacho(hojas);
   const st=porPuerta.map(p=>{ const hs=hojas.filter(h=>h.puerta===p);
     if(!hs.length) return `<span class="no">${esc(p)}: sin hoja</span>`;
@@ -1086,9 +1089,10 @@ function drawDespacho(fecha,placa,hojas,origen){
   const tp=porPuerta.map(p=>r2(filas.reduce((a,r)=>a+(r.pp[p]||0),0)));
   const gt=r2(tp.reduce((a,b)=>a+b,0));
   $("#d-out").innerHTML = `
-    <div class="card noprint"><div class="muted">${esc(origen)}</div><div class="st">${st}</div>
+    <div class="noprint" style="margin:0 0 8px"><button class="btn sec sm" id="d-back">← Volver a la lista</button></div>
+    <div class="card noprint"><h2 style="margin:0 0 2px">Despacho ${esc(placa)}${DVIAJE>1?" · Viaje "+DVIAJE:""}</h2><div class="muted">${fechaCorta(fecha)} · ${esc(origen)}</div><div class="st">${st}</div>
       ${pend?`<div class="warnbox">⚠ Hay ${pend} pesada${pend>1?"s":""} con tara pendiente: el consolidado incluye su peso bruto.</div>`:""}
-      <div class="muted" style="margin-top:8px">Datos del despacho (se imprimen en el SGA.R.G.001 y se registran en el Registro Interno):</div>
+      <div class="muted" style="margin-top:8px">Datos del vehículo tomados del pesaje (solo se completan los que falten). Luego elija el tipo de manejo y escriba las observaciones; se imprimen en el SGA.R.G.001 y se registran en el Registro Interno.</div>
       <div class="row2">
         <div><label class="f" for="p-op">Empresa operadora</label><input id="p-op" class="in" list="dl-emp" autocomplete="off"></div>
         <div><label class="f" for="p-cond">Conductor</label><input id="p-cond" class="in" autocomplete="off"></div>
@@ -1118,7 +1122,7 @@ function drawDespacho(fecha,placa,hojas,origen){
   const phMan=()=>{ $("#ph-man").textContent=manTxt(); };
   Object.keys(map).forEach(k=>{
     const inp=$("#"+map[k]); if(!inp) return;
-    inp.value=DESP[k]||""; inp.disabled=!!bloq||((k==="man"||k==="manP"||k==="obs")&&!can("manejo"));
+    inp.value=DESP[k]||""; inp.disabled=!!bloq||((k==="man"||k==="manP"||k==="obs")&&!can("manejo"))||(["op","cond","brev","hora"].includes(k)&&!!DESP[k]&&!(SES&&SES.rol==="Administrador"));
     const out=$("#ph-"+k); if(out) out.textContent=DESP[k]||"";
     inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; phMan(); despChanged(); });
   });
@@ -1169,11 +1173,13 @@ function aprobHTML(hayPesadas,sinHoja){
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
       ${ap||!FALTAN.length?"":`<div class="sinres"><label><input type="checkbox" id="a-sinres"><span>Confirmo que en ${FALTAN.map(esc).join(" y ")} no se generaron residuos para este vehículo.</span></label><div class="muted" style="margin-top:4px">Si hubo pesadas en esa puerta, no marcar: crear y cerrar la hoja correspondiente.</div></div>`}
       <div class="muted" style="margin-top:6px">${ap?"Reabre":"Aprueba"}: <b>${esc(SES?SES.nombre:"")}</b> (queda registrado)</div>
+      <label class="f" for="a-clave">Ingrese su clave para ${ap?"reabrir":"aprobar"}</label>
+      <input id="a-clave" class="in" type="password" autocomplete="current-password" placeholder="Su contraseña">
       <div class="row2" style="margin-top:8px"><button class="btn sec" id="a-cancel">Cancelar</button><button class="btn" id="a-ok">${ap?"Reabrir":"Aprobar"}</button></div>
       <div id="a-err" class="warnbox hidden"></div>
     </div></div>`;
 }
-const ERR_APR={permiso:"Su rol no permite esta acción.",sesion:"La sesión venció. Ingrese nuevamente.",sin_datos_despacho:"Faltan los datos del despacho (empresa y tipo de manejo).",ya_aprobado:"Despacho ya aprobado.",sin_pesadas:"Sin pesadas para aprobar.",clave:"La clave configurada en el Google Sheet no coincide.",aprobado:"Despacho ya aprobado."};
+const ERR_APR={clave_requerida:"Ingrese su clave para confirmar.",clave_incorrecta:"La clave es incorrecta.",bloqueado:"Demasiados intentos fallidos. Espere 10 minutos.",permiso:"Su rol no permite esta acción.",sesion:"La sesión venció. Ingrese nuevamente.",sin_datos_despacho:"Faltan los datos del despacho (empresa y tipo de manejo).",ya_aprobado:"Despacho ya aprobado.",sin_pesadas:"Sin pesadas para aprobar.",clave:"La clave configurada en el Google Sheet no coincide.",aprobado:"Despacho ya aprobado."};
 async function aprobarDesp(){
   const box=$("#a-box"), modo=box.dataset.modo, e=$("#a-err");
   const err=m=>{ e.textContent=m; e.classList.remove("hidden"); };
@@ -1197,12 +1203,13 @@ async function aprobarDesp(){
     if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
     if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
   }
+  const clave=$("#a-clave").value; if(!clave) return err("Ingrese su clave para confirmar.");
   const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
   try{
     await sync(); await sync();      // primero se sube todo lo pendiente
     const pendLocal=HOJAS.some(h=>h.fecha===fecha&&normPlaca(h.placa)===placa&&vj(h.viaje)===viaje&&dirty(h))||LS.get(DESPQ,{})[DKEY];
     if(pendLocal) return err("Hay datos pendientes de sincronización. Verificar la conexión y reintentar.");
-    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,},60000);
+    const j=await postJ({key:CFG.CLAVE,action:modo,sede:CFG.PLANTA,fecha,placa,viaje,claveConfirma:clave},60000);
     if(j&&j.ok){
       toast(modo==="aprobar"?"Despacho aprobado: ya está en el Registro Interno.":"Despacho reabierto.");
       if(j.aviso) alert(j.aviso);
@@ -1390,11 +1397,12 @@ document.addEventListener("click",e=>{
   const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
   if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
   const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value&&H) $("#d-placa").value=H.placa; if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ modoDetalle(false); if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value&&H) $("#d-placa").value=H.placa; if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
-  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho(); return; }
+  const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); consultarDespacho().then(()=>window.scrollTo({top:0})); return; }
+  if(t.closest("#d-back")){ modoDetalle(false); drawHojas(); window.scrollTo({top:0}); return; }
   const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ HOJAS=HOJAS.filter(x=>x!==h); DB.del(h.id).then(()=>{ drawHojas(); toast("Hoja eliminada."); }); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
   const cb=t.closest("[data-cb]"); if(cb){ OPENCB=OPENCB===cb.dataset.cb?null:cb.dataset.cb; drawCatList(); return; }
