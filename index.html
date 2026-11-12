@@ -102,6 +102,39 @@ button.pch{border:1px dashed #9a8a7a;background:#fff;cursor:pointer}
   .tabs{max-width:780px}
 }
 
+/* modo simple (Operador) */
+body.simple .tabs{display:none}
+body.superv [data-tab="hoja"]{display:none}
+.sv{padding:2px 12px 8px}
+.sv .r{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #F5EDE4}
+.sv .r:last-child{border-bottom:0}
+.sv .cats{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0 2px}
+.sv .cats span{background:var(--sand);border-radius:999px;padding:3px 10px;font-size:12.5px}
+.sv .cats b{color:var(--brown)}
+#v-op{max-width:560px;margin:0 auto}
+.opt{margin:14px 2px 6px;font-size:15px;font-weight:bold;color:var(--brown)}
+.btn.xl{min-height:64px;font-size:19px;border-radius:14px}
+.tk{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0}
+.tk .p{font-size:22px;font-weight:bold;color:var(--ink);letter-spacing:.5px}
+.tk .p .bdg{font-size:12px;vertical-align:middle;margin-left:6px}
+.tk .m{color:var(--gray);font-size:13.5px;margin-top:2px}
+.tk .pchs{padding:8px 0 0}
+.tk.done{background:#F3FAEF}
+.doors{display:grid;gap:10px;margin:8px 0 14px}
+.door{width:100%;text-align:left;border:2px solid var(--taupe);background:#fff;border-radius:14px;padding:14px;min-height:76px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.door b{font-size:21px;color:var(--brown)}
+.door small{display:block;color:var(--gray);font-size:13px;margin-top:2px}
+.door.has{border-color:var(--green);background:#F3FAEF}
+.door.ce{border-color:#9DB9D9;background:#EEF4FB}
+.door.lock{opacity:.7}
+.door .go{font-size:26px;color:var(--brown)}
+.opf label.f{font-size:14px}
+.opf .in{min-height:52px;font-size:18px}
+.opf .placa{font-size:26px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}
+.optool{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 2px}
+.optool span{font-weight:bold;color:var(--brown)}
+.mas{margin:10px 0;border:1px dashed var(--taupe);border-radius:10px;padding:6px 10px;background:#FBF7F2}
+.mas summary{cursor:pointer;font-weight:bold;color:var(--brown);padding:6px 0}
 /* hoja */
 .hhead{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0}
 .hhead .l1{font-weight:bold;color:var(--brown);font-size:16px}
@@ -290,6 +323,9 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     </div>
   </section>
 
+  <!-- MODO SIMPLE (Operador): camiones en curso, llegada y puertas -->
+  <section id="v-op" class="hidden"><div id="op-body"></div></section>
+
   <!-- HOJA ABIERTA -->
   <section id="v-hoja" class="hidden">
     <div class="hhead">
@@ -394,12 +430,16 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
       <label class="f">Tara del coche (kg)</label>
       <div class="chips" id="f-taras"></div>
       <div style="height:6px"></div>
+      <details class="mas" id="f-mas"><summary>Más opciones (otra tara, cantidad)</summary>
+      <label class="f" for="f-otra">Otra tara (kg)</label>
       <input id="f-otra" class="in" inputmode="decimal" autocomplete="off" placeholder="Otra tara (kg)">
+      <div class="chips" id="f-taras2" style="margin-top:8px"></div>
       <label class="f">Cantidad (opcional)</label>
       <div class="row2">
         <input id="f-uni" class="in" inputmode="numeric" autocomplete="off" placeholder="Ej.: 3">
         <select id="f-tu" class="in"></select>
       </div>
+      </details>
       <div class="prev" id="f-prev">—</div>
       <div class="err" id="f-err"></div>
       <div class="stick">
@@ -509,6 +549,8 @@ let SES=LS.get(SESK,null);
 if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
 const tok=()=>SES?SES.token:"";
 const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
+const SIMPLE=()=>AUTH&&!!SES&&SES.rol==="Operador";
+const SUPERV=()=>AUTH&&!!SES&&SES.rol==="Inspector";   // el Inspector supervisa: no pesa, abre en Despacho
 const can=p=>!AUTH||(!!SES&&(PERM[p]||[]).includes(SES.rol));
 const ajena=h=>AUTH&&!!SES&&SES.rol==="Operador"&&!!h.usuario&&h.usuario!==SES.usuario;
 async function gj(r){ const j=await r.json(); sesionErr(j); return j; }
@@ -640,9 +682,10 @@ async function syncRun(){
     } else { lastErr=(j&&j.error)||"error"; return; }
   }
 }
+let syncAgain=false;
 function sync(){
-  if(syncing) return syncing;
-  syncing=syncRun().catch(()=>{}).then(()=>{ syncing=null; drawQueue(); drawHojas();
+  if(syncing){ syncAgain=true; return syncing; }          // un cambio llegó mientras se enviaba: se repite el envío al terminar
+  syncing=(async()=>{ do{ syncAgain=false; await syncRun().catch(()=>{}); }while(syncAgain&&!lastErr&&navigator.onLine); })().then(()=>{ syncing=null; drawQueue(); drawHojas();
     if(lastErr==="clave") toast("La clave de la app no coincide con la configurada en el Google Sheet.");
     if(lastErr==="permiso") toast("Su rol no permite este cambio.");
     if(lastErr==="aprobado") toast("Despacho ya aprobado: el cambio no se envió. Solicitar la reapertura.");
@@ -664,13 +707,18 @@ let tT; function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add
 
 /* ---------- navegación ---------- */
 let TAB="hoja";
+function entraDesp(){ modoDetalle(false); if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value&&H) $("#d-placa").value=H.placa; if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); }
 function showView(){
   if(TAB==="usr"&&!can("usuarios")) TAB="hoja";
   if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
   if(TAB==="act"&&!can("actividad")) TAB="hoja";
-  const inHoja = TAB==="hoja" && H;
+  if(TAB==="desp"&&SIMPLE()) TAB="hoja";
+  if(TAB==="hoja"&&SUPERV()){ TAB="desp"; entraDesp(); }
+  const inHoja = TAB==="hoja" && H, simple=SIMPLE();
   if(inHoja) drawHoja();
-  $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H));
+  $("#v-home").classList.toggle("hidden",!(TAB==="hoja" && !H && !simple));
+  $("#v-op").classList.toggle("hidden",!(TAB==="hoja" && !H && simple));
+  if(TAB==="hoja" && !H && simple) drawOp();
   $("#v-hoja").classList.toggle("hidden",!inHoja);
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
   $("#v-usr").classList.toggle("hidden",TAB!=="usr");
@@ -741,7 +789,8 @@ function drawHojas(){
   const aprobHoy=all.filter(g=>g.fecha===hoy&&aprobada(g.hojas[0])).length;
   $("#kpis").innerHTML=`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div>
     <div class="kpi"><div class="l">Hojas abiertas</div><div class="n">${abiertas}</div></div>`;
-  $("#d-kpis").innerHTML=`<div class="kpi ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
+  const enCurso=all.filter(g=>g.fecha===hoy&&!aprobada(g.hojas[0])).length;
+  $("#d-kpis").innerHTML=(SUPERV()?`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div><div class="kpi"><div class="l">Camiones en curso</div><div class="n">${enCurso}</div></div>`:"")+`<div class="kpi ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
     <div class="kpi"><div class="l">Aprobados hoy</div><div class="n">${aprobHoy}</div></div>`;
   const multi=g=>g.viaje>1||all.some(x=>x.fecha===g.fecha&&x.placa===g.placa&&x.viaje>1);
   const tit=g=>esc(g.placa)+(multi(g)?` · Viaje ${g.viaje}`:"");
@@ -757,19 +806,28 @@ function drawHojas(){
   /* Pesaje: hojas agrupadas por vehículo (placa y viaje) */
   const cardP=g=>`<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg</div></div></div>
       <div style="padding:2px 10px 6px">${g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(hojaRow).join("")}</div></div>`;
+  /* Inspector: resumen de lo pesado en el vehículo, por puerta y por tipo de residuo */
+  const svDetalle=g=>{
+    const rows=g.hojas.slice().sort((a,b)=>(a.creado||0)-(b.creado||0)).map(h=>{ const ap=aprobada(h);
+      return `<div class="r"><div><b>${esc(h.puerta)}</b><div class="muted">${esc(h.responsable)} · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}</div></div><div style="text-align:right"><b>${fmt(kgHoja(h))} kg</b><div>${ap?'<span class="bdg ap">🔒 aprobada</span>':`<span class="bdg ${h.estado==="cerrada"?"ce":"ab"}">${h.estado==="cerrada"?"cerrada":"abierta"}</span>`}</div></div></div>`; }).join("");
+    const M=new Map(); g.hojas.forEach(h=>(h.pesadas||[]).forEach(p=>M.set(p.cat||"Sin tipo",r2((M.get(p.cat||"Sin tipo")||0)+netoDe(p)))));
+    const cats=[...M.entries()].sort((a,b)=>b[1]-a[1]).map(([c,k])=>`<span>${esc(c)} <b>${fmt(k)} kg</b></span>`).join("");
+    return `<div class="sv">${rows}${cats?`<div class="cats">${cats}</div>`:""}</div>`;
+  };
   /* Despacho: un control SGA.R.G.001 por vehículo y viaje, con el estado de sus puertas */
   const cardD=g=>{
     const ap=aprobada(g.hojas[0]);
     const puertas=CFG.PUERTAS.concat(g.hojas.map(h=>h.puerta).filter(p=>!CFG.PUERTAS.includes(p)));
     const chips=puertas.map(p=>{
       const hs=g.hojas.filter(h=>h.puerta===p), pc=p.replace(/^Puerta\s*/i,"P");
-      if(!hs.length) return ap?`<span class="pch sh">${esc(pc)} sin hoja</span>`:`<button class="pch sh" data-newp="${esc(p)}|${g.fecha}|${esc(g.placa)}|${g.viaje}">${esc(pc)} sin hoja · + crear</button>`;
+      if(!hs.length) return ap||SUPERV()?`<span class="pch sh">${esc(pc)} sin hoja</span>`:`<button class="pch sh" data-newp="${esc(p)}|${g.fecha}|${esc(g.placa)}|${g.viaje}">${esc(pc)} sin hoja · + crear</button>`;
+      if(SUPERV()) return "";   // el detalle por puerta ya está arriba
       const cerr=hs.every(h=>h.estado==="cerrada");
       return `<span class="pch ${ap?"ok":cerr?"ce":"ab"}">${esc(pc)} ${ap?"✓":cerr?"cerrada":"abierta"}</span>`;
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
-      <div class="pchs">${chips}</div>
-      <div class="dfoot">${(()=>{ const cz=ap?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.every(h=>h.estado==="cerrada")&&g.hojas.some(h=>(h.pesadas||[]).length);
+      ${SUPERV()?svDetalle(g):""}<div class="pchs">${chips}</div>
+      <div class="dfoot">${(()=>{ const cz=ap||SUPERV()?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.every(h=>h.estado==="cerrada")&&g.hojas.some(h=>(h.pesadas||[]).length);
         return ap?`<button class="btn sm" data-gdesp="${k}">Ver despacho</button>`:listo?`<button class="btn sm" data-gdesp="${k}">Generar despacho</button>`:`<button class="btn sm" disabled style="opacity:.5">Generar despacho</button><div class="muted" style="width:100%;text-align:right;font-size:11.5px">Cierre las hojas abiertas para generarlo.</div>`; })()}</div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
@@ -780,6 +838,7 @@ function drawHojas(){
   $("#h-list").innerHTML=lista(cardP,"Sin hojas registradas en este equipo.");
   $("#d-list").innerHTML=lista(cardD,"Sin despachos registrados en este equipo.");
   drawQueue();
+  if(SIMPLE()&&!H&&TAB==="hoja"&&OP.v!=="nuevo") drawOp();
 }
 let viajeOk=null;   // viaje nuevo ya confirmado (evita preguntar dos veces mientras se completan los datos del vehículo)
 async function startHoja(viajeFijo){
@@ -834,11 +893,130 @@ function openHoja(id){
   refrescaAprob(H).then(()=>{ if(H&&H.id===id){ drawHoja(); drawHojas(); } });
 }
 
+/* ---------- modo simple (Operador): camiones en curso → llegada → puerta → pesar ---------- */
+let OP={v:"inicio",k:null}, OPSRCH=false;
+const dkOp=h=>h.fecha+"|"+normPlaca(h.placa)+"|"+vj(h.viaje);            // clave de un camión (fecha|placa|viaje)
+const dkParse=k=>{ const [f,p,v]=k.split("|"); return {fecha:f,placa:p,viaje:vj(v)}; };
+function camionesHoy(){
+  const hoy=todayStr(), M=new Map();
+  const add=(placa,viaje)=>{ const k=hoy+"|"+normPlaca(placa)+"|"+vj(viaje); if(!M.has(k)) M.set(k,{k,placa:normPlaca(placa),viaje:vj(viaje),hojas:[]}); return M.get(k); };
+  HOJAS.filter(h=>h.fecha===hoy).forEach(h=>add(h.placa,h.viaje).hojas.push(h));
+  const reg=Object.assign({},LS.get(VEHK,{}),LS.get(DESPQ,{}));
+  Object.keys(reg).forEach(k=>{ const [f,pl,v]=k.split("|"); if(f===hoy&&pl) add(pl,v); });
+  return [...M.values()].filter(c=>!aprobada({fecha:hoy,placa:c.placa,viaje:c.viaje})).map(c=>{ c.d=vehDe(dkey(hoy,c.placa,c.viaje)); return c; })
+    .sort((a,b)=>String((b.d&&b.d.hora)||"").localeCompare(String((a.d&&a.d.hora)||""))||a.placa.localeCompare(b.placa));
+}
+const hojaDe=(c,puerta)=>c.hojas.find(h=>h.puerta===puerta);
+function chipsPuertas(c){
+  return CFG.PUERTAS.map(p=>{ const h=hojaDe(c,p), pc=p.replace(/^Puerta\s*/i,"P");
+    if(!h) return `<span class="pch">${esc(pc)}</span>`;
+    return `<span class="pch ${h.estado==="cerrada"?"ce":"ok"}">${esc(pc)} · ${fmt(kgHoja(h))} kg${h.estado==="cerrada"?" ✓":""}</span>`; }).join("");
+}
+function drawOp(){
+  const box=$("#op-body"); if(!box) return;
+  if(OP.v==="nuevo") return;                         // no se redibuja mientras se escribe
+  const lista=camionesHoy();
+  if(OP.v==="camion"){
+    const c=lista.find(x=>x.k===OP.k);
+    if(!c){ OP={v:"inicio",k:null}; return drawOp(); }
+    const d=c.d||{}, multi=c.viaje>1;
+    box.innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
+      <div class="card"><div class="tk" style="border:0;padding:0;margin:0;background:none"><div class="p">${esc(c.placa)}${multi?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}</div>
+      <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}${d.hora?" · llegó "+esc(d.hora):""}</div></div></div>
+      <div class="opt">¿En qué puerta lo va a pesar?</div>
+      <div class="doors">${CFG.PUERTAS.map(p=>{ const h=hojaDe(c,p), aj=h&&ajena(h);
+        const sub=h?`${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}${h.estado==="cerrada"?" · terminada":" · en curso"}${aj?" · "+esc(h.responsable):""}`:"Sin pesar todavía";
+        return `<button class="door ${h?(h.estado==="cerrada"?"ce":"has"):""} ${aj?"lock":""}" data-door="${esc(p)}"><span><b>${esc(p)}</b><small>${sub}</small></span><span class="go">›</span></button>`; }).join("")}</div>
+      <button class="btn xl" data-op="fin">Terminé con este camión</button>
+      <div class="muted" style="text-align:center;margin-top:8px">Al terminar, sus hojas se cierran y se envían.</div>`;
+    return;
+  }
+  box.innerHTML=`<button class="btn xl" data-op="nuevo" style="margin-top:6px">＋ Llegó un camión</button>
+    <div class="opt">Camiones en curso</div>`+
+    (lista.length?lista.map(c=>{ const d=c.d||{}, hs=c.hojas, listo=hs.length&&hs.every(h=>h.estado==="cerrada");
+      return `<button class="tk ${listo?"done":""}" data-tk="${esc(c.k)}"><div class="p">${esc(c.placa)}${c.viaje>1?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}${listo?`<span class="bdg ap">terminado</span>`:""}</div>
+        <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}</div><div class="pchs">${chipsPuertas(c)}</div></button>`; }).join("")
+      :`<div class="card muted">No hay camiones en curso. Cuando llegue uno, toque «Llegó un camión».</div>`);
+}
+function drawOpNuevo(){
+  OP={v:"nuevo",k:null};
+  const placas=[...new Set(CFG.PLACAS.concat(Object.keys(LS.get(VEHS,{}))))];
+  $("#op-body").innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
+    <div class="card opf"><h2>Llegó un camión</h2>
+      <label class="f" for="op-placa">Placa del vehículo</label>
+      <input id="op-placa" class="in placa" list="dl-op" autocapitalize="characters" autocomplete="off" placeholder="ABZ-937"><datalist id="dl-op">${placas.map(p=>`<option value="${esc(p)}">`).join("")}</datalist>
+      <div class="vehya hidden" id="op-ya"></div>
+      <label class="f" for="op-emp">Empresa operadora</label>
+      <input id="op-emp" class="in" list="dl-emp" autocomplete="off">
+      <label class="f" for="op-cond">Conductor</label>
+      <input id="op-cond" class="in" list="dl-cond" autocomplete="off" placeholder="Nombre y apellido">
+      <div class="row2"><div><label class="f" for="op-brev">Brevete</label><input id="op-brev" class="in" autocomplete="off"></div>
+      <div><label class="f" for="op-hora">Hora de llegada</label><input id="op-hora" class="in" type="time" value="${horaAhora()}"></div></div>
+      <div class="err" id="op-err"></div>
+      <div class="row2" style="margin-top:10px"><button class="btn sec" data-op="inicio">Cancelar</button><button class="btn" data-op="seguir">Continuar</button></div></div>`;
+  $("#dl-emp").innerHTML=(CFG.EMPRESAS.length?CFG.EMPRESAS:EMPRESAS_BASE).map(p=>`<option value="${esc(p)}">`).join("");
+  $("#dl-cond").innerHTML=[...new Set(Object.values(LS.get(VEHS,{})).map(v=>v.conductor))].map(c=>`<option value="${esc(c)}">`).join("");
+  ["#op-emp","#op-cond","#op-brev"].forEach(i=>$(i).addEventListener("input",()=>{ $(i).dataset.auto="0"; }));
+  $("#op-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); opPlaca(); });
+  $("#op-cond").addEventListener("change",e=>{ const c=e.target.value.trim().toLowerCase(), v=Object.values(LS.get(VEHS,{})).find(x=>x.conductor.toLowerCase()===c); if(v&&!$("#op-brev").value){ $("#op-brev").value=v.brevete||""; $("#op-brev").dataset.auto="1"; } });
+  $("#op-placa").focus();
+}
+function opPlaca(){
+  const placa=normPlaca($("#op-placa").value), hoy=todayStr(), ya=placa.length>=5&&camionesHoy().find(c=>c.placa===placa&&c.d);
+  const my=$("#op-ya"); my.classList.toggle("hidden",!ya);
+  if(ya) my.textContent="✓ Este camión ya está en curso con sus datos registrados. Toque «Continuar» para elegir la puerta.";
+  if(!ya){ const h=placa.length>=5?vehsGet(placa):null; if(h){ opAuto("#op-emp",h.empresa); opAuto("#op-cond",h.conductor); opAuto("#op-brev",h.brevete); } else if(placa.length<5){ ["#op-emp","#op-cond","#op-brev"].forEach(i=>opAuto(i,"")); } }
+}
+function opAuto(id,val){ const el=$(id); if(!el.value||el.dataset.auto==="1"){ el.value=val||""; el.dataset.auto=val?"1":"0"; } }
+async function opSeguir(){
+  const e=$("#op-err"); e.textContent="";
+  const placa=normPlaca($("#op-placa").value), hoy=todayStr();
+  if(placa.length<5) return void(e.textContent="Escriba la placa del camión.");
+  if(!SES) return void(e.textContent="Inicie sesión para registrar.");
+  const ex=camionesHoy().filter(c=>c.placa===placa&&c.d).sort((a,b)=>b.viaje-a.viaje)[0];
+  if(ex){ OP={v:"camion",k:ex.k}; return drawOp(); }
+  const d={empresa:$("#op-emp").value.trim(),conductor:$("#op-cond").value.trim().replace(/\s+/g," "),brevete:$("#op-brev").value.trim().toUpperCase(),hora:$("#op-hora").value};
+  if(!d.empresa) return void(e.textContent="Escriba la empresa.");
+  if(d.conductor.split(" ").length<2) return void(e.textContent="Escriba el nombre y apellido del conductor.");
+  if(!d.brevete) return void(e.textContent="Escriba el brevete.");
+  if(!d.hora) return void(e.textContent="Indique la hora de llegada.");
+  // viaje: si el último viaje de este camión ya fue aprobado, este es un viaje nuevo
+  let v=Math.max(1,...HOJAS.filter(h=>h.fecha===hoy&&normPlaca(h.placa)===placa).map(h=>vj(h.viaje)));
+  for(let i=0;i<10;i++){ await refrescaAprob({fecha:hoy,placa,viaje:v}); if(!aprobada({fecha:hoy,placa,viaje:v})) break; v++; }
+  if(v>1&&!HOJAS.some(h=>h.fecha===hoy&&normPlaca(h.placa)===placa&&vj(h.viaje)===v)&&!confirm("Este camión ya salió hoy (despacho aprobado).\n¿Llegó otra vez? Se registrará como Viaje "+v+".")) return void(e.textContent="No se registró.");
+  const kV=dkey(hoy,placa,v);
+  vehSet(kV,d); vehsPut(placa,d);
+  const q=LS.get(DESPQ,{}); q[kV]={key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha:hoy,placa,viaje:v,empresa:d.empresa,conductor:d.conductor,brevete:d.brevete,hora:d.hora,manejoNP:"",manejoP:"",obs:""}; LS.set(DESPQ,q);
+  drawQueue(); sync();
+  OP={v:"camion",k:hoy+"|"+placa+"|"+v}; if(v>1) toast("Viaje "+v+" iniciado."); drawOp();
+}
+async function opPuerta(puerta){
+  const c=camionesHoy().find(x=>x.k===OP.k); if(!c) return;
+  const ex=hojaDe(c,puerta); if(ex) return openHoja(ex.id);
+  await refrescaAprob({fecha:todayStr(),placa:c.placa,viaje:c.viaje});
+  if(aprobada({fecha:todayStr(),placa:c.placa,viaje:c.viaje})) return toast("Este camión ya fue despachado.");
+  const h={id:uuid(),puerta,fecha:todayStr(),placa:c.placa,viaje:c.viaje,responsable:SES.nombre,usuario:SES.usuario,estado:"abierta",pesadas:[],creado:Date.now(),rev:0,sync:0};
+  HOJAS.push(h); await saveHoja(h); LS.set("pesaje.puerta",puerta); openHoja(h.id);
+}
+async function opTerminar(){
+  const c=camionesHoy().find(x=>x.k===OP.k); if(!c) return;
+  const mias=c.hojas.filter(h=>!ajena(h)&&!aprobada(h)), abiertas=mias.filter(h=>h.estado!=="cerrada"&&(h.pesadas||[]).length);
+  const pend=abiertas.reduce((a,h)=>a+pendHoja(h),0);
+  if(pend) return toast("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Complete la tara para terminar.");
+  if(!abiertas.length&&!mias.some(h=>(h.pesadas||[]).length)) return toast("Todavía no pesó nada en este camión.");
+  for(const h of abiertas){ h.estado="cerrada"; await saveHoja(h); }
+  toast("Camión terminado."+(navigator.onLine?" Enviando…":" Se enviará cuando haya señal."));
+  OP={v:"inicio",k:null}; drawOp();
+}
+
 /* ---------- hoja ---------- */
 function drawHoja(){
   const ap = aprobada(H), ro = H.estado==="cerrada"||ap||ajena(H);
-  $("#hh-l1").textContent=`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`+((vj(H.viaje)>1||HOJAS.some(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)>1))?` · Viaje ${vj(H.viaje)}`:"");
-  $("#hh-l2").textContent=`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":ajena(H)?" · solo lectura (hoja de otro usuario)":H.estado==="cerrada"?" · hoja cerrada":""}`;
+  const S=SIMPLE(), multiV=(vj(H.viaje)>1||HOJAS.some(x=>x.fecha===H.fecha&&normPlaca(x.placa)===normPlaca(H.placa)&&vj(x.viaje)>1));
+  $("#hh-l1").textContent=S?`${H.placa} · ${H.puerta}`+(multiV?` · Viaje ${vj(H.viaje)}`:""):`${H.puerta} · ${fechaCorta(H.fecha)} · ${H.placa}`+(multiV?` · Viaje ${vj(H.viaje)}`:"");
+  $("#hh-l2").textContent=S?(ap?"🔒 Despacho aprobado: solo lectura":ajena(H)?`Solo lectura: hoja de ${H.responsable}`:H.estado==="cerrada"?"Hoja cerrada. Toque «Reabrir hoja» para agregar pesadas.":""):`Responsable: ${H.responsable}${ap?" · 🔒 despacho aprobado":ajena(H)?" · solo lectura (hoja de otro usuario)":H.estado==="cerrada"?" · hoja cerrada":""}`;
+  $("#hh-l2").classList.toggle("hidden",S&&!$("#hh-l2").textContent);
+  $("#q").classList.toggle("hidden",S&&!OPSRCH&&!$("#q").value);
   $("#hh-kg").textContent=fmt(kgHoja(H));
   const u={}; H.pesadas.forEach(p=>{ if(p.uni) u[p.tu||"UD"]=(u[p.tu||"UD"]||0)+p.uni; });
   $("#hh-un").textContent=uniTxt(u);
@@ -859,7 +1037,9 @@ function drawHoja(){
   H.pesadas.forEach(p=>last.set(p.key,Math.max(last.get(p.key)||0,p.ts||0)));
   const pinned=CAT.filter(x=>last.has(x.key)&&match(x)).sort((a,b)=>last.get(b.key)-last.get(a.key));
   let html="";
-  if(pinned.length) html+=`<div class="cat rec"><span>Pesados en esta hoja</span><span>último primero</span></div>`+pinned.map(row).join("");
+  const pinHtml=pinned.length?`<div class="cat rec"><span>Pesados en esta hoja</span><span>último primero</span></div>`+pinned.map(row).join(""):"";
+  if(S) html+=`<div class="optool"><span>Toque el tipo de residuo</span><button class="btn sec sm" type="button" data-op="buscar">🔍 Buscar</button></div>`;
+  else html+=pinHtml;
   const rest=CAT.filter(x=>!last.has(x.key)&&match(x));
   const bl=BLOQUES.map(b=>({b,items:rest.filter(x=>b.cats.includes(x.cat)),todos:CAT.filter(x=>b.cats.includes(x.cat))}));
   const kgBloque=b=>r2(CAT.filter(x=>b.cats.includes(x.cat)).reduce((a,x)=>a+totales(H,x.key).kg,0));
@@ -874,8 +1054,10 @@ function drawHoja(){
     }
     return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
   }).join("")+`</div>`;
+  if(S) html+=pinHtml;
   $("#lista").innerHTML = html || `<div class="card muted">Sin resultados.</div>`;
-  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap);
+  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"Cerrar hoja y enviar"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(H.estado!=="cerrada"||ajena(H))));
+  $("#b-back").textContent=S?"← Volver al camión":"← Hojas";
 }
 
 async function cerrarGrupo(f,pl,v){
@@ -917,21 +1099,23 @@ function openSheet(key){
   const last=LS.get("pesaje.lastTara",null);
   TARA = last && last.t ? last : {t:"val",v:tarasRec()[0]??null};
   $("#f-tu").value=LS.get("pesaje.lastTu",CFG.UNIDADES[0][0]);
+  $("#f-mas").open=!SIMPLE();
   resetForm(); drawSheet(); $("#sheet").classList.remove("hidden");
   setTimeout(()=>$("#f-bruto").focus(),60);
 }
 function closeSheet(){ $("#sheet").classList.add("hidden"); CUR=null; EDIT=null; drawHoja(); }
 function resetForm(){
   EDIT=null; $("#f-bruto").value=""; $("#f-uni").value=""; $("#f-otra").value=""; $("#f-err").textContent="";
-  $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent="Agregar pesada"; $("#f-cancel").classList.add("hidden");
+  $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent=SIMPLE()?"Guardar pesada":"Agregar pesada"; $("#f-cancel").classList.add("hidden");
   drawTaras(); drawPrev();
 }
 function drawTaras(){
   const L=tarasRec();
   if(TARA.t==="val" && TARA.v!=null && !L.includes(TARA.v)) L.unshift(TARA.v);
-  $("#f-taras").innerHTML = L.map(v=>`<button type="button" data-tv="${v}" class="${TARA.t==="val"&&TARA.v===v?"on":""}">${fmt(v)}</button>`).join("")
-    + `<button type="button" data-tn="1" class="${TARA.t==="none"?"on":""}">Sin tara</button>`
-    + `<button type="button" data-tp="1" class="pend ${TARA.t==="pend"?"on":""}">Pendiente</button>`;
+  const bSin=`<button type="button" data-tn="1" class="${TARA.t==="none"?"on":""}">Sin tara</button>`, bPen=`<button type="button" data-tp="1" class="pend ${TARA.t==="pend"?"on":""}">Pendiente</button>`;
+  $("#f-taras").innerHTML = L.map(v=>`<button type="button" data-tv="${v}" class="${TARA.t==="val"&&TARA.v===v?"on":""}">${fmt(v)}</button>`).join("") + (SIMPLE()?"":bSin+bPen);
+  $("#f-taras2").innerHTML = SIMPLE()?bSin+bPen:"";
+  if(SIMPLE()&&(TARA.t!=="val"||$("#f-otra").value)) $("#f-mas").open=true;
 }
 function readForm(){
   const bruto=num($("#f-bruto").value);
@@ -991,6 +1175,7 @@ function editPesada(id){
   if(p.taraPend) TARA={t:"pend"}; else if(!p.tara) TARA={t:"none"}; else TARA={t:"val",v:p.tara};
   if(p.tu) $("#f-tu").value=p.tu;
   $("#f-title").textContent="Corregir pesada"; $("#f-add").textContent="Guardar cambio"; $("#f-cancel").classList.remove("hidden");
+  if(p.uni||!p.tara||p.taraPend) $("#f-mas").open=true;
   drawTaras(); drawPrev(); drawSheet(); $("#f-bruto").focus();
 }
 let delAsk=null;
@@ -1290,6 +1475,7 @@ async function catGuardar(extra){
 function drawUser(){
   const c=$("#chip-u"); c.classList.toggle("hidden",!(AUTH&&SES));
   if(AUTH&&SES) c.textContent="👤 "+SES.nombre.split(" ")[0];
+  document.body.classList.toggle("simple",SIMPLE()); document.body.classList.toggle("superv",SUPERV());
   $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
   $("#tab-cat").classList.toggle("hidden",!can("catalogo")||!AUTH);
   $("#tab-act").classList.toggle("hidden",!can("actividad")||!AUTH);
@@ -1313,7 +1499,7 @@ async function doLogin(ev){
     const j=await postJ({key:CFG.CLAVE,action:"login",usuario:u,clave:c},30000);
     if(!j||!j.ok) return void(e.textContent=ERR_LOGIN[j&&j.error]||"No se pudo ingresar ("+((j&&j.error)||"error")+").");
     setSes(j); $("#login").classList.add("hidden"); $("#lg-p").value="";
-    drawUser(); drawHome(); showView();
+    OP={v:"inicio",k:null}; drawUser(); drawHome(); showView();
     if(SES.cambiar) openCta(true); else { sync(); cargaCatalogo(); refrescaDia(); }
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
   finally{ b.disabled=false; b.textContent="Ingresar"; }
@@ -1343,7 +1529,7 @@ async function doCta(ev){
 function cerrarSesion(){
   const n=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length;
   if(n&&!confirm("Hay "+n+" registro"+(n>1?"s":"")+" por enviar. Se enviarán cuando vuelva a iniciar sesión con conexión.\n¿Cerrar sesión?")) return;
-  H=null; TAB="hoja"; needLogin(); showView();
+  H=null; TAB="hoja"; OP={v:"inicio",k:null}; needLogin(); showView();
 }
 const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 8 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
 function claveAzar(){ const A="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>A[x%A.length]).join(""); }
@@ -1394,10 +1580,19 @@ async function crearUsuario(){
 /* ---------- eventos ---------- */
 document.addEventListener("click",e=>{
   const t=e.target;
+  const opb=t.closest("[data-op]"); if(opb){ const a=opb.dataset.op;
+    if(a==="inicio"){ OP={v:"inicio",k:null}; drawOp(); window.scrollTo(0,0); }
+    else if(a==="nuevo") drawOpNuevo();
+    else if(a==="seguir") opSeguir();
+    else if(a==="fin") opTerminar();
+    else if(a==="buscar"){ OPSRCH=!OPSRCH; if(!OPSRCH) $("#q").value=""; drawHoja(); if(OPSRCH) $("#q").focus(); }
+    return; }
+  const tkc=t.closest("[data-tk]"); if(tkc){ OP={v:"camion",k:tkc.dataset.tk}; drawOp(); window.scrollTo(0,0); return; }
+  const dr=t.closest("[data-door]"); if(dr){ opPuerta(dr.dataset.door); return; }
   const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
   if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
   const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ modoDetalle(false); if(!$("#d-fecha").value) $("#d-fecha").value=H?H.fecha:todayStr(); if(!$("#d-placa").value&&H) $("#d-placa").value=H.placa; if(H) $("#d-viaje").value=vj(H.viaje); dlDesp(); } if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp") entraDesp(); if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
@@ -1440,7 +1635,7 @@ $("#u-list").addEventListener("click",ev=>{
   if(ac){ const u=ac.dataset.uact, x=USRS.find(z=>z.usuario===u); if(x&&confirm((x.activo?"¿Desactivar a ":"¿Activar a ")+x.nombre+"?")) usrOp({action:"usuario_editar",usuario:u,activo:!x.activo},x.activo?"Usuario desactivado.":"Usuario activado."); }
 });
 $("#n-go").addEventListener("click",()=>startHoja());
-$("#b-back").addEventListener("click",()=>{ H=null; drawHome(); showView(); });
+$("#b-back").addEventListener("click",()=>{ if(SIMPLE()){ OP={v:"camion",k:dkOp(H)}; OPSRCH=false; H=null; showView(); return; } H=null; drawHome(); showView(); });
 $("#b-close").addEventListener("click",cerrarOReabrir);
 $("#q").addEventListener("input",()=>drawHoja());
 $("#sh-x").addEventListener("click",closeSheet);
