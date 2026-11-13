@@ -1855,7 +1855,6 @@ function aprobHTML(hayPesadas,sinHoja){
   return `<div class="card noprint" id="apr">${top}
     ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
-      ${ap||!FALTAN.length?"":`<div class="sinres"><label><input type="checkbox" id="a-sinres"><span>Confirmo que en ${FALTAN.map(esc).join(" y ")} no se generaron residuos para este vehículo.</span></label><div class="muted" style="margin-top:4px">Si hubo pesadas en esa puerta, no marcar: crear y cerrar la hoja correspondiente.</div></div>`}
       <div class="muted" style="margin-top:6px">${ap?"Reabre":"Aprueba"}: <b>${esc(SES?SES.nombre:"")}</b> (queda registrado)</div>
       <label class="f" for="a-clave">Ingrese su clave para ${ap?"reabrir":"aprobar"}</label>
       <input id="a-clave" class="in" type="password" autocomplete="current-password" placeholder="Su contraseña">
@@ -1877,9 +1876,6 @@ async function aprobarDesp(){
     if(ab.length) return err("Hay hojas abiertas ("+ab.join(", ")+"). Cerrarlas antes de aprobar.");
     const pend=DFILAS.reduce((a,r)=>a+r.pend,0);
     if(pend) return err("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Completarlas antes de aprobar.");
-    if(FALTAN.length){
-      if(!$("#a-sinres").checked) return err("Faltan hojas en: "+FALTAN.join(", ")+". Crear la hoja o marcar la confirmación de que no hubo residuos.");
-    }
     if(!DESP.op.trim()) return err("Falta la empresa operadora.");
     if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
     if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
