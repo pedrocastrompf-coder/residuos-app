@@ -1730,8 +1730,8 @@ function officialHTML(fecha,placa,filas,tipoRes){
     <div class="osec">RESIDUOS PELIGROSOS</div>
     <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
     ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UD: unidades</div>`:""}
-    <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td>${(()=>{ const ap=filas.filter(r=>r.cat!=="No aprovechable"&&r.cat!=="Peligrosos").reduce((a,r)=>a+(r.total||0),0), na=filas.filter(r=>r.cat==="No aprovechable"||r.cat==="Peligrosos").reduce((a,r)=>a+(r.total||0),0);
-      return `<div class="osum">• Residuos aprovechables: ${fmt(r2(ap))} kg<br>• Residuos no aprovechables: ${fmt(r2(na))} kg<br>• Total de residuos: ${fmt(r2(ap+na))} kg</div>`; })()}<span id="ph-obs"></span></td><td id="ph-prec"></td></tr></table>
+    <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td>${(()=>{ const kgDe=f=>filas.filter(f).reduce((a,r)=>a+(r.total||0),0), ap=kgDe(r=>r.cat!=="No aprovechable"&&r.cat!=="Peligrosos"), na=kgDe(r=>r.cat==="No aprovechable"), pe=kgDe(r=>r.cat==="Peligrosos");
+      return `<div class="osum">• Residuos aprovechables: ${fmt(r2(ap))} kg<br>• Residuos no aprovechables: ${fmt(r2(na))} kg<br>• Residuos peligrosos: ${fmt(r2(pe))} kg<br>• Total de residuos: ${fmt(r2(ap+na+pe))} kg</div>`; })()}<span id="ph-obs"></span></td><td id="ph-prec"></td></tr></table>
     <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
   </div>`;
