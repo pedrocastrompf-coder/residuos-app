@@ -517,6 +517,8 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
 /* pestañas en celular: más compactas y legibles */
 @media(max-width:1023px){ .tabs{position:sticky;top:60px;z-index:19} .tab{padding:8px 12px;font-size:13px} }
 @media(max-width:520px){ .kpi{padding-right:16px} .kpi[class*="ki-"]::before,.kpi[class*="ki-"]::after{display:none} }
+#pl-sel{min-height:40px;padding:6px 32px 6px 12px;font-size:15px;font-weight:650;border-radius:10px;margin-top:4px;-webkit-appearance:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23623C21' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center/14px;box-shadow:0 1px 2px rgba(43,33,24,.08)}
+#pl-sel:focus-visible{outline:2px solid var(--ring,#6ABF4B);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.tabs,#app,.navcol::before{transition:none!important}}
 .umenu{position:fixed;z-index:70;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(43,33,24,.16);padding:6px;display:flex;flex-direction:column}
 .umenu .umh{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
