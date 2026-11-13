@@ -250,6 +250,9 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 .lg h2{margin:0 0 2px;font-size:18px}
 .lg img{height:44px;display:block;margin:0 auto 10px}
 .lg .err{margin-top:8px}
+.plchk{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}.plchk label{display:flex;gap:6px;align-items:center}
+#pl-sel{font:inherit;color:inherit;background:transparent;border:1px solid rgba(255,255,255,.55);border-radius:6px;padding:2px 6px;max-width:100%}#pl-sel option{color:#222}
+textarea.in{min-height:0;font:inherit;resize:vertical}
 .urow{border-top:1px solid var(--line);padding:10px 0}
 .urow:first-child{border-top:0}
 .urow .nm{font-weight:bold}
@@ -277,6 +280,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     <button class="tab on" data-tab="hoja">Pesaje</button>
     <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
     <button class="tab hidden" data-tab="cat" id="tab-cat">Catálogo</button>
+    <button class="tab hidden" data-tab="pla" id="tab-pla">Plantas</button>
     <button class="tab hidden" data-tab="usr" id="tab-usr">Usuarios</button>
     <button class="tab hidden" data-tab="act" id="tab-act">Actividad</button>
   </div>
@@ -389,6 +393,24 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
     </div>
     <input id="c-q" class="in search" placeholder="Buscar residuo…" autocomplete="off">
     <div class="card"><div id="c-list" class="muted">Cargando…</div></div>
+    <div class="card"><h2>Control de cambios del archivo <span class="bdg ap" id="c-ver"></span></h2>
+      <div class="muted" id="c-verinfo">Cada residuo nuevo agrega una columna al Registro Interno y sube la versión del archivo de esta planta.</div>
+      <div id="c-cambios" class="muted" style="margin-top:6px"></div></div>
+  </section>
+
+  <!-- PLANTAS Y LUGARES DE DESPACHO (Inspector y Administrador) -->
+  <section id="v-pla" class="hidden">
+    <div class="card"><h2>Plantas y lugares de despacho</h2>
+      <div class="muted">Cada planta guarda sus registros en su propio Google Sheet, con la misma estructura. Los lugares de despacho son las puertas o almacenes donde se pesa.</div>
+      <div id="pl-list" class="muted" style="margin-top:8px">Cargando…</div></div>
+    <div class="card"><h2>Crear planta</h2>
+      <label class="f" for="pl-nom">Nombre de la planta</label>
+      <input id="pl-nom" class="in" autocomplete="off" placeholder="Ej.: Pisco 1">
+      <label class="f" for="pl-lug">Lugares de despacho (uno por línea)</label>
+      <textarea id="pl-lug" class="in" rows="3" placeholder="Puerta 1"></textarea>
+      <div class="muted" style="margin-top:6px">Al crearla se genera su Google Sheet. Puede tardar hasta un minuto.</div>
+      <div class="err" id="pl-err"></div>
+      <button class="btn" id="pl-crear" style="margin-top:8px">Crear planta</button></div>
   </section>
 
   <!-- USUARIOS (solo Administrador) -->
@@ -402,6 +424,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
         <div><label class="f" for="u-usr">Usuario</label><input id="u-usr" class="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Ej.: alopez"></div>
         <div><label class="f" for="u-rol">Rol</label><select id="u-rol" class="in"><option>Operador</option><option>Inspector</option><option>Administrador</option></select></div>
       </div>
+      <div id="u-plbox" class="hidden"><label class="f">Plantas en las que trabaja</label><div id="u-plantas" class="plchk"></div></div>
       <label class="f" for="u-clv">Contraseña temporal</label>
       <div style="display:flex;gap:8px"><input id="u-clv" class="in" autocomplete="off" spellcheck="false"><button class="btn sec sm2" id="u-gen" type="button">Generar</button></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px"><input type="checkbox" id="u-cambiar" checked> Exigir que cambie la contraseña en su primer ingreso (recomendado)</label>
@@ -531,17 +554,25 @@ let OPENB=null;
 async function cargaCatalogo(){
   if(!CFG.SCRIPT_URL||!navigator.onLine) return;
   try{
-    const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
+    const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&sede=${encodeURIComponent(CFG.PLANTA)}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
     const j=await gj(r);
     if(j&&j.ok&&j.residuos&&j.residuos.length){ LS.set(CATK,j.residuos); setCat(j.residuos); if(H&&TAB==="hoja") drawHoja(); }
   }catch(e){}
 }
 
 /* ---------- almacenamiento local ---------- */
+/* cada planta guarda aparte sus datos locales (aprobaciones, catálogo, cola de despachos, vehículos…) */
+const BASE=CFG.PLANTA, PLK="pesaje.plantas", PLSEL="pesaje.planta";
+const LS_PLANTA=["pesaje.aprob","pesaje.catalogo","pesaje.despq","pesaje.placa","pesaje.puerta","pesaje.veh","pesaje.vehs"];
+const lsk=k=>CFG.PLANTA!==BASE&&LS_PLANTA.includes(k)?k+"@"+CFG.PLANTA:k;
 const LS = {
-  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
-  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  get(k,d){ try{ const v=localStorage.getItem(lsk(k)); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(lsk(k),JSON.stringify(v)); }catch(e){} }
 };
+let PLANTAS=LS.get(PLK,null)||[{planta:BASE,lugares:CFG.PUERTAS.slice(),activo:true}];
+const plantasAct=()=>PLANTAS.filter(p=>p.activo!==false);
+function usaPlanta(n){ const A=plantasAct(), p=A.find(x=>x.planta===n)||A.find(x=>x.planta===BASE)||A[0]||{planta:BASE,lugares:CFG.PUERTAS}; CFG.PLANTA=p.planta; CFG.PUERTAS=(p.lugares||[]).slice(); }
+usaPlanta(LS.get(PLSEL,BASE));
 setCat(LS.get(CATK,null)||CAT_CONFIG);
 /* ---------- sesión y roles ---------- */
 const SESK="pesaje.ses";
@@ -549,7 +580,7 @@ const AUTH=!!CFG.SCRIPT_URL;                // sin Google Sheet conectado la app
 let SES=LS.get(SESK,null);
 if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
 const tok=()=>SES?SES.token:"";
-const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
+const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],plantas:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
 const SIMPLE=()=>AUTH&&!!SES&&SES.rol==="Operador";
 const SUPERV=()=>AUTH&&!!SES&&SES.rol==="Inspector";   // el Inspector supervisa: no pesa, abre en Despacho
 const can=p=>!AUTH||(!!SES&&(PERM[p]||[]).includes(SES.rol));
@@ -566,7 +597,7 @@ const DB = {
     r.onsuccess=()=>{ this._db=r.result; res(r.result); }; r.onerror=()=>rej(r.error); }); },
   async tx(mode,fn){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction("hojas",mode); const rq=fn(t.objectStore("hojas")); t.oncomplete=()=>res(rq&&rq.result); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error); }); },
   async all(){ try{ return (await this.tx("readonly",s=>s.getAll()))||[]; }catch(e){ return Array.from(MEM.values()); } },
-  async put(h){ MEM.set(h.id,h); try{ await this.tx("readwrite",s=>s.put(h)); }catch(e){} },
+  async put(h){ if(!h.sede) h.sede=CFG.PLANTA; MEM.set(h.id,h); try{ await this.tx("readwrite",s=>s.put(h)); }catch(e){} },
   async del(id){ MEM.delete(id); try{ await this.tx("readwrite",s=>s.delete(id)); }catch(e){} }
 };
 
@@ -611,7 +642,7 @@ let bajando=null, LASTDIA=0, LASTVEH=0;   // última descarga correcta del día 
 // si el estado de hoy se descargó hace menos de un minuto, no se consulta otra vez al servidor antes de abrir
 async function aprobFresco(q){ if(q.fecha===todayStr()&&Date.now()-LASTDIA<60000) return; await refrescaAprob(q); }
 async function getJ(params){
-  const q=Object.entries(params).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+  const q=Object.entries(Object.assign({sede:CFG.PLANTA},params)).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
   const r=await fetchT(`${CFG.SCRIPT_URL}?${q}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
   return gj(r);
 }
@@ -669,7 +700,7 @@ function payloadDe(h){
 let syncing=null, lastErr="";
 const DESPQ="pesaje.despq";    // despachos con datos por enviar: {clave: payload}
 async function postJ(obj,ms=60000){
-  const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({},obj,obj.action==="login"?{}:{token:tok()}))},ms);
+  const r=await fetchT(CFG.SCRIPT_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({sede:CFG.PLANTA},obj,obj.action==="login"?{}:{token:tok()}))},ms);
   const j=await r.json(); if(obj.action!=="login") sesionErr(j); return j;
 }
 async function syncRun(){
@@ -734,6 +765,7 @@ function entraDesp(){ modoDetalle(false); if(!$("#d-fecha").value) $("#d-fecha")
 function showView(){
   if(TAB==="usr"&&!can("usuarios")) TAB="hoja";
   if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
+  if(TAB==="pla"&&!can("plantas")) TAB="hoja";
   if(TAB==="act"&&!can("actividad")) TAB="hoja";
   if(TAB==="desp"&&SIMPLE()) TAB="hoja";
   if(TAB==="hoja"&&SUPERV()&&!H){ TAB="desp"; entraDesp(); }
@@ -745,6 +777,7 @@ function showView(){
   $("#v-hoja").classList.toggle("hidden",!inHoja);
   $("#v-desp").classList.toggle("hidden",TAB!=="desp");
   $("#v-usr").classList.toggle("hidden",TAB!=="usr");
+  $("#v-pla").classList.toggle("hidden",TAB!=="pla");
   $("#v-cat").classList.toggle("hidden",TAB!=="cat");
   $("#v-act").classList.toggle("hidden",TAB!=="act");
   $("#dock").classList.toggle("hidden",!inHoja);
@@ -759,8 +792,31 @@ function dlDesp(){
   const resto=CFG.PLACAS.filter(p=>!con.includes(p));
   $("#dl-placas-d").innerHTML = con.map(p=>`<option value="${esc(p)}">`).join("")+resto.map(p=>`<option value="${esc(p)}">`).join("");
 }
+async function cargaPlantas(){
+  if(!AUTH||!SES||!navigator.onLine) return;
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"plantas"},30000); if(!j||!j.ok||!j.plantas||!j.plantas.length) return;
+    PLANTAS=j.plantas; LS.set(PLK,PLANTAS);
+    const A=plantasAct();
+    if(A.length&&!A.some(p=>p.planta===CFG.PLANTA)){ LS.set(PLSEL,A[0].planta); return void location.reload(); }   // la planta en uso ya no está disponible para este usuario
+    const p=A.find(x=>x.planta===CFG.PLANTA);
+    if(p&&p.lugares.join("|")!==CFG.PUERTAS.join("|")){ CFG.PUERTAS=p.lugares.slice(); if(!CFG.PUERTAS.includes(selPuerta)) selPuerta=""; drawHome(); if(SIMPLE()&&!H) drawOp(); }
+    drawPlantaSel(); if(TAB==="pla") drawPlantas(); if(TAB==="usr") drawUsrPlantas();
+  }catch(e){}
+}
+function drawPlantaSel(){
+  const A=plantasAct(), s=$("#sub");
+  if(A.length>1) s.innerHTML=`<select id="pl-sel" aria-label="Planta">${A.map(p=>`<option${p.planta===CFG.PLANTA?" selected":""}>${esc(p.planta)}</option>`).join("")}</select>`;
+  else s.textContent=CFG.PLANTA;
+}
+function cambiaPlanta(n){
+  if(n===CFG.PLANTA) return;
+  const pend=HOJAS.filter(h=>dirty(h)&&!ajena(h)).length+Object.keys(LS.get(DESPQ,{})).length;
+  if(pend){ toast("Hay "+pend+" registro"+(pend>1?"s":"")+" por enviar en "+CFG.PLANTA+". Espere a que se envíen antes de cambiar de planta."); drawPlantaSel(); sync(); return; }
+  LS.set(PLSEL,n); location.reload();
+}
 function drawHome(){
-  $("#sub").textContent = CFG.PLANTA;
+  drawPlantaSel();
   $("#n-puerta").innerHTML = CFG.PUERTAS.map(p=>`<button type="button" data-p="${esc(p)}" class="${p===selPuerta?"on":""}">${esc(p)}</button>`).join("");
   $("#dl-placas").innerHTML = CFG.PLACAS.map(p=>`<option value="${esc(p)}">`).join("");
   $("#dl-emp").innerHTML = (CFG.EMPRESAS.length?CFG.EMPRESAS:EMPRESAS_BASE).map(p=>`<option value="${esc(p)}">`).join("");
@@ -1531,6 +1587,9 @@ async function drawCatAdm(){
     $("#c-cat").innerHTML=j.categorias.map(c=>`<option>${esc(c)}</option>`).join(""); $("#c-man").innerHTML=j.manejos.map(c=>`<option>${esc(c)}</option>`).join("");
     if(sc) $("#c-cat").value=sc; if(sm) $("#c-man").value=sm;
     drawCatList();
+    const fh=t=>{ const d=new Date(t); return isNaN(d)?esc(String(t)):new Intl.DateTimeFormat("es-PE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:CFG.ZONA_HORARIA}).format(d); };
+    $("#c-ver").textContent=j.version?"Versión "+j.version+" · "+CFG.PLANTA:"";
+    $("#c-cambios").innerHTML=(j.cambios||[]).map(c=>`<div class="arow"><b>v${esc(String(c.version))} · ${esc(c.cambio)}</b>${esc(c.detalle||"")}<div class="muted">${fh(c.fecha)} · ${esc(c.usuario)}</div></div>`).join("")||"Sin cambios registrados.";
   }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
 }
 function catEditar(name){
@@ -1555,6 +1614,37 @@ async function catGuardar(extra){
   finally{ bt.disabled=false; bt.textContent="Guardar"; }
 }
 
+/* ---------- plantas y lugares de despacho (Inspector y Administrador) ---------- */
+const ERR_PLA={permiso:"No tiene permiso para esta acción.",nombre_invalido:"Nombre inválido: use de 3 a 30 letras o números.",planta_existe:"Ya existe una planta con ese nombre.",lugares_invalidos:"Ingrese al menos un lugar de despacho (uno por línea).",planta_principal:"La planta principal no se puede desactivar.",planta_no_asignada:"No tiene asignada esa planta.",planta:"Planta no encontrada."};
+const lugTxt=v=>String(v||"").split("\n").map(x=>x.trim()).filter(x=>x);
+function drawPlantas(){
+  $("#pl-list").innerHTML=PLANTAS.map(p=>{ const act=p.activo!==false;
+    return `<div class="urow"><div class="nm">${esc(p.planta)} <span class="bdg ${act?"ap":"inact"}">${act?"activa":"desactivada"}</span>${p.planta===CFG.PLANTA?' <span class="bdg ab">en uso</span>':""}</div>
+      <label class="f">Lugares de despacho (uno por línea)</label><textarea class="in" rows="3" data-pllug="${esc(p.planta)}">${esc((p.lugares||[]).join("\n"))}</textarea>
+      <div class="acts"><button class="btn sec sm2" data-plsave="${esc(p.planta)}">Guardar lugares</button>${p.planta!==BASE?`<button class="btn sec sm2" data-plact="${esc(p.planta)}">${act?"Desactivar":"Activar"}</button>`:""}${p.url?`<a class="btn sec sm2" style="text-decoration:none" href="${esc(p.url)}" target="_blank" rel="noopener">Abrir su Google Sheet</a>`:""}</div></div>`; }).join("")||"Sin plantas.";
+}
+async function plaOp(body,msg,ms){
+  if(!navigator.onLine){ toast("Requiere conexión con el Google Sheet."); return null; }
+  try{ const j=await postJ(Object.assign({key:CFG.CLAVE},body),ms||60000);
+    if(j&&j.ok){ if(msg) toast(msg); await cargaPlantas(); drawPlantas(); return j; }
+    toast(ERR_PLA[j&&j.error]||"No se pudo completar ("+((j&&j.error)||"error")+")."); return null;
+  }catch(x){ toast("Sin conexión con el Google Sheet."); return null; }
+}
+async function crearPlanta(){
+  const e=$("#pl-err"); e.textContent="";
+  const planta=$("#pl-nom").value.trim().replace(/\s+/g," "), lugares=lugTxt($("#pl-lug").value);
+  if(planta.length<3) return void(e.textContent=ERR_PLA.nombre_invalido);
+  if(!lugares.length) return void(e.textContent=ERR_PLA.lugares_invalidos);
+  if(!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
+  const bt=$("#pl-crear"); bt.disabled=true; bt.textContent="Creando su Google Sheet…";
+  try{
+    const j=await postJ({key:CFG.CLAVE,action:"planta_crear",planta,lugares},240000);
+    if(!j||!j.ok) return void(e.textContent=ERR_PLA[j&&j.error]||"No se pudo crear ("+((j&&j.error)||"error")+").");
+    $("#pl-nom").value=""; $("#pl-lug").value=""; toast("Planta "+planta+" creada con su Google Sheet."); await cargaPlantas(); drawPlantas();
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet. Antes de reintentar, revise si la planta ya aparece en la lista."; }
+  finally{ bt.disabled=false; bt.textContent="Crear planta"; }
+}
+
 /* ---------- inicio de sesión, cuenta y administración de usuarios ---------- */
 function drawUser(){
   const c=$("#chip-u"); c.classList.toggle("hidden",!(AUTH&&SES));
@@ -1562,6 +1652,7 @@ function drawUser(){
   document.body.classList.toggle("simple",SIMPLE()); document.body.classList.toggle("superv",SUPERV());
   $("#tab-usr").classList.toggle("hidden",!can("usuarios")||!AUTH);
   $("#tab-cat").classList.toggle("hidden",!can("catalogo")||!AUTH);
+  $("#tab-pla").classList.toggle("hidden",!can("plantas")||!AUTH);
   $("#tab-act").classList.toggle("hidden",!can("actividad")||!AUTH);
   const r=$("#n-resp"); if(AUTH&&SES&&SES.rol!=="Administrador"){ r.value=SES.nombre; r.readOnly=true; } else { r.readOnly=false; if(AUTH&&SES&&!r.value) r.value=SES.nombre; }   // el Administrador puede registrar a nombre de otra persona
 }
@@ -1584,7 +1675,7 @@ async function doLogin(ev){
     if(!j||!j.ok) return void(e.textContent=ERR_LOGIN[j&&j.error]||"No se pudo ingresar ("+((j&&j.error)||"error")+").");
     setSes(j); $("#login").classList.add("hidden"); $("#lg-p").value="";
     OP={v:"inicio",k:null}; drawUser(); drawHome(); showView();
-    if(SES.cambiar) openCta(true); else { sync(); cargaCatalogo(); refrescaDia(); }
+    if(SES.cambiar) openCta(true); else { cargaPlantas(); sync(); cargaCatalogo(); refrescaDia(); }
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
   finally{ b.disabled=false; b.textContent="Ingresar"; }
 }
@@ -1607,7 +1698,7 @@ async function doCta(ev){
   try{
     const j=await postJ({key:CFG.CLAVE,action:"cambiarClave",actual:a,nueva:n},30000);
     if(!j||!j.ok) return void(e.textContent=ERR_CTA[j&&j.error]||"No se pudo cambiar ("+((j&&j.error)||"error")+").");
-    setSes(j); $("#cta").classList.add("hidden"); drawUser(); drawHome(); showView(); toast("Contraseña actualizada."); sync(); cargaCatalogo();
+    setSes(j); $("#cta").classList.add("hidden"); drawUser(); drawHome(); showView(); toast("Contraseña actualizada."); cargaPlantas(); sync(); cargaCatalogo();
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
 }
 function cerrarSesion(){
@@ -1618,7 +1709,13 @@ function cerrarSesion(){
 const ERR_USR={usuario_invalido:"Usuario inválido: use 3 a 30 letras minúsculas, números, punto o guion bajo.",nombre_invalido:"Ingrese nombre y apellido.",rol_invalido:"Rol inválido.",clave_corta:"La contraseña temporal debe tener entre 4 y 64 caracteres.",usuario_existe:"Ya existe ese usuario.",usuario_no_existe:"El usuario no existe.",propio:"No puede desactivarse ni cambiar su propio rol.",ultimo_admin:"Debe quedar al menos un Administrador activo.",permiso:"Su rol no permite esta acción."};
 function claveAzar(){ const A="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>A[x%A.length]).join(""); }
 let USRS=[];
+function drawUsrPlantas(){
+  const A=plantasAct(), box=$("#u-plantas"), prev=new Set([...box.querySelectorAll("input:checked")].map(i=>i.value));
+  $("#u-plbox").classList.toggle("hidden",A.length<2);
+  box.innerHTML=A.map(p=>`<label><input type="checkbox" value="${esc(p.planta)}"${(prev.size?prev.has(p.planta):p.planta===CFG.PLANTA)?" checked":""}> ${esc(p.planta)}</label>`).join("");
+}
 async function drawUsuarios(){
+  drawUsrPlantas();
   const L=$("#u-list"); if(!$("#u-clv").value) $("#u-clv").value=claveAzar();
   if(!navigator.onLine) return void(L.textContent="Requiere conexión con el Google Sheet.");
   try{
@@ -1627,6 +1724,7 @@ async function drawUsuarios(){
     USRS=j.usuarios;
     L.innerHTML=USRS.map(u=>`<div class="urow"><div class="nm">${esc(u.nombre)} <span class="bdg ${u.activo?"ap":"inact"}">${u.activo?"activo":"desactivado"}</span>${u.cambiar?' <span class="bdg q">clave temporal</span>':""}</div>
       <div class="muted">${esc(u.usuario)}</div>
+      ${plantasAct().length>1?`<div class="plchk" style="margin-top:6px">${u.rol==="Administrador"?'<span class="muted">Todas las plantas</span>':plantasAct().map(p=>`<label><input type="checkbox" data-upl="${esc(u.usuario)}" value="${esc(p.planta)}"${(u.plantas||[]).includes(p.planta)?" checked":""}> ${esc(p.planta)}</label>`).join("")}</div>`:""}
       <div class="acts"><select class="in" data-urol="${esc(u.usuario)}">${["Operador","Inspector","Administrador"].map(r=>`<option${r===u.rol?" selected":""}>${r}</option>`).join("")}</select>
       <button class="btn sec sm2" data-ures="${esc(u.usuario)}">Resetear contraseña</button>
       <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
@@ -1654,7 +1752,9 @@ async function crearUsuario(){
   if(nombre.split(" ").length<2) return void(e.textContent="Ingrese nombre y apellido.");
   if(!/^[a-z0-9._]{3,30}$/.test(usuario)) return void(e.textContent=ERR_USR.usuario_invalido);
   if(clave.length<4) return void(e.textContent=ERR_USR.clave_corta);
-  const j=await postJ({key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave,cambiar:$("#u-cambiar").checked},30000).catch(()=>null);
+  const body={key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave,cambiar:$("#u-cambiar").checked};
+  if(plantasAct().length>1){ body.plantas=[...$("#u-plantas").querySelectorAll("input:checked")].map(i=>i.value); if(!body.plantas.length&&rol!=="Administrador") return void(e.textContent="Marque al menos una planta."); if(!body.plantas.length) body.plantas=[CFG.PLANTA]; }
+  const j=await postJ(body,30000).catch(()=>null);
   if(!j) return void(e.textContent="Sin conexión con el Google Sheet.");
   if(!j.ok) return void(e.textContent=ERR_USR[j.error]||"No se pudo crear ("+j.error+").");
   alert("Perfil creado.\nUsuario: "+usuario+"\nContraseña temporal: "+clave+"\nEntréguela a la persona: "+($("#u-cambiar").checked?"deberá cambiarla al ingresar.":"podrá seguir usándola (puede cambiarla desde su cuenta)."));
@@ -1676,7 +1776,7 @@ document.addEventListener("click",e=>{
   const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
   if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
   const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp") entraDesp(); if(TAB==="usr") drawUsuarios(); if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp") entraDesp(); if(TAB==="usr") drawUsuarios(); if(TAB==="pla"){ drawPlantas(); cargaPlantas(); } if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
@@ -1712,7 +1812,17 @@ $("#cta-out").addEventListener("click",cerrarSesion);
 $("#chip-u").addEventListener("click",()=>openCta(false));
 $("#u-gen").addEventListener("click",()=>{ $("#u-clv").value=claveAzar(); });
 $("#u-crear").addEventListener("click",crearUsuario);
-$("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-urol]"); if(sel) usrOp({action:"usuario_editar",usuario:sel.dataset.urol,rol:sel.value},"Rol actualizado."); });
+$("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-urol]"); if(sel) return void usrOp({action:"usuario_editar",usuario:sel.dataset.urol,rol:sel.value},"Rol actualizado.");
+  const pl=ev.target.closest("[data-upl]"); if(pl){ const u=pl.dataset.upl, L=[...$("#u-list").querySelectorAll("[data-upl]")].filter(i=>i.dataset.upl===u&&i.checked).map(i=>i.value);
+    if(!L.length){ pl.checked=true; return toast("Cada usuario necesita al menos una planta."); }
+    usrOp({action:"usuario_editar",usuario:u,plantas:L},"Plantas actualizadas."); } });
+$("#sub").addEventListener("change",ev=>{ if(ev.target.id==="pl-sel") cambiaPlanta(ev.target.value); });
+$("#pl-crear").addEventListener("click",crearPlanta);
+$("#pl-list").addEventListener("click",ev=>{
+  const sv=ev.target.closest("[data-plsave]"), ac=ev.target.closest("[data-plact]");
+  if(sv){ const n=sv.dataset.plsave, ta=[...$("#pl-list").querySelectorAll("[data-pllug]")].find(x=>x.dataset.pllug===n), lug=lugTxt(ta.value); if(!lug.length) return toast(ERR_PLA.lugares_invalidos); plaOp({action:"planta_editar",planta:n,lugares:lug},"Lugares de despacho actualizados."); }
+  if(ac){ const n=ac.dataset.plact, p=PLANTAS.find(x=>x.planta===n); if(p&&confirm((p.activo!==false?"¿Desactivar la planta ":"¿Activar la planta ")+n+"?"+(p.activo!==false?"\nSus registros se conservan en su Google Sheet.":""))) plaOp({action:"planta_editar",planta:n,activo:p.activo===false},p.activo!==false?"Planta desactivada.":"Planta activada."); }
+});
 $("#u-list").addEventListener("click",ev=>{
   const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]");
   if(rs){ const u=rs.dataset.ures, c=claveAzar(); if(confirm("¿Resetear la contraseña de "+u+"?\nSe cerrarán sus sesiones abiertas.")) usrOp({action:"usuario_resetear",usuario:u,clave:c}).then(ok=>{ if(ok) alert("Contraseña temporal de "+u+": "+c+"\nEntréguela a la persona: deberá cambiarla al ingresar."); }); }
@@ -1758,12 +1868,12 @@ function limpiaEquipo(){
 
 /* ---------- arranque ---------- */
 (async function init(){
-  HOJAS = await DB.all();
+  HOJAS = (await DB.all()).filter(h=>(h.sede||BASE)===CFG.PLANTA);      // solo las hojas de la planta en uso
   HOJAS.forEach(h=>{ h.pesadas=h.pesadas||[]; });
   limpiaEquipo();
   drawNet(); drawHome(); showView();
   if(AUTH&&!SES) showLogin(); else if(SES&&SES.cambiar) openCta(true);
-  if(navigator.onLine&&(!AUTH||SES)){ sync(); cargaCatalogo(); refrescaDia(); }
+  if(navigator.onLine&&(!AUTH||SES)){ cargaPlantas(); sync(); cargaCatalogo(); refrescaDia(); }
   try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
   if("serviceWorker" in navigator && location.protocol!=="file:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
