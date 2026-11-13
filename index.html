@@ -430,6 +430,11 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
 .lg img{height:56px;margin-bottom:14px}
 .lg h2{text-align:center;font-weight:700;color:var(--ink)}
 .lg #lg-msg{text-align:center;margin-bottom:6px}
+.umenu{position:fixed;z-index:70;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(43,33,24,.16);padding:6px;display:flex;flex-direction:column}
+.umenu .umh{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.umenu .umh b{display:block;color:var(--ink);font-size:14px}.umenu .umh span{color:var(--mute);font-size:12px}
+.umenu button{border:0;background:none;text-align:left;padding:10px;border-radius:8px;font-size:14px;color:var(--ink)}
+.umenu button:hover{background:#F6EFE8}.umenu #um-salir{color:var(--red)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .oleg{font-size:7pt;margin-top:4px;color:#333}.onm{display:flex;justify-content:space-between;align-items:baseline;gap:6px}.oun{white-space:nowrap;font-weight:normal;text-align:right}
 @media print{.tabs{display:none!important} #app{padding-left:0!important;margin:0!important;background:#fff!important} html,body{background:#fff!important;font-family:Arial,sans-serif}
@@ -443,7 +448,7 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
     <h1>Pesaje de residuos sólidos<small id="sub"></small></h1>
     <button class="chip q hidden" id="chip-q"></button>
     <span class="chip" id="chip-net"><i></i><span>Con conexión</span></span>
-    <button class="chip hidden" id="chip-u" title="Mi cuenta"></button>
+    <button class="chip hidden" id="chip-u" title="Mi cuenta" aria-haspopup="menu" aria-expanded="false"></button>
   </div>
 
   <div class="qwarn noprint hidden" id="q-warn"><span id="q-txt"></span><button class="btn sm" id="q-now" type="button">Enviar ahora</button></div>
@@ -687,6 +692,11 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
     <button class="btn" id="cta-go" type="submit">Cambiar contraseña</button>
     <div class="row2" style="margin-top:8px"><button class="btn sec" id="cta-x" type="button">Cerrar</button><button class="btn sec" id="cta-out" type="button">Cerrar sesión</button></div>
   </form>
+</div>
+<div class="umenu hidden" id="umenu" role="menu">
+  <div class="umh" id="umh"></div>
+  <button type="button" role="menuitem" id="um-clave">Cambiar contraseña</button>
+  <button type="button" role="menuitem" id="um-salir">Cerrar sesión</button>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -1904,7 +1914,7 @@ function openCta(forzar){
   CTAF=!!forzar; $("#login").classList.add("hidden"); $("#cta").classList.remove("hidden");
   $("#cta-t").textContent=forzar?"Cambie su contraseña":"Mi cuenta";
   $("#cta-i").textContent=forzar?"La contraseña temporal debe reemplazarse antes de continuar.":(SES?SES.nombre+" · "+SES.usuario+" · "+SES.rol:"");
-  $("#cta-x").classList.toggle("hidden",CTAF);
+  $("#cta-x").classList.toggle("hidden",CTAF); $("#cta-out").classList.toggle("hidden",!CTAF);
   ["cta-a","cta-n","cta-r"].forEach(i=>$("#"+i).value=""); $("#cta-err").textContent="";
   setTimeout(()=>$("#cta-a").focus(),50);
 }
@@ -2031,7 +2041,18 @@ $("#lg-form").addEventListener("submit",doLogin);
 $("#cta-form").addEventListener("submit",doCta);
 $("#cta-x").addEventListener("click",()=>$("#cta").classList.add("hidden"));
 $("#cta-out").addEventListener("click",cerrarSesion);
-$("#chip-u").addEventListener("click",()=>openCta(false));
+function toggleUMenu(abrir){
+  const m=$("#umenu"), c=$("#chip-u"), ab=abrir!==undefined?abrir:m.classList.contains("hidden");
+  if(ab){ const b=c.getBoundingClientRect(); m.style.top=(b.bottom+6)+"px"; m.style.right=Math.max(8,innerWidth-b.right)+"px";
+    $("#umh").innerHTML=SES?`<b>${esc(SES.nombre)}</b><span>${esc(SES.usuario)} · ${esc(SES.rol)}</span>`:""; }
+  m.classList.toggle("hidden",!ab); c.setAttribute("aria-expanded",ab?"true":"false");
+}
+$("#chip-u").addEventListener("click",ev=>{ ev.stopPropagation(); toggleUMenu(); });
+$("#um-clave").addEventListener("click",()=>{ toggleUMenu(false); openCta(false); });
+$("#um-salir").addEventListener("click",()=>{ toggleUMenu(false); cerrarSesion(); });
+document.addEventListener("click",ev=>{ if(!ev.target.closest("#umenu")&&!$("#umenu").classList.contains("hidden")) toggleUMenu(false); });
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape") toggleUMenu(false); });
+addEventListener("resize",()=>toggleUMenu(false));
 $("#u-gen").addEventListener("click",()=>{ $("#u-clv").value=claveAzar(); });
 $("#u-crear").addEventListener("click",crearUsuario);
 $("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-urol]"); if(sel) return void usrOp({action:"usuario_editar",usuario:sel.dataset.urol,rol:sel.value},"Rol actualizado.");
