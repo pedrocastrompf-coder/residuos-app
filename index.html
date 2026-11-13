@@ -1533,11 +1533,14 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const un=x=>{ const u=UN.get(x.key)||{}; const t=Object.keys(u).filter(k=>u[k]).map(k=>fmt(u[k])+" "+k).join(" · "); return t?`<span class="oun">${esc(t)}</span>`:""; };
   const nom=x=>`<div class="onm"><span>${esc(x.name)}</span>${un(x)}</div>`;
   const hayUn=filas.some(r=>Object.values(r.uni||{}).some(v=>v));
+  // residuos pesados que ya no están en el catálogo de la app (retirados o de otra lista): igual se imprimen en su categoría
+  const fuera=filas.filter(r=>!CATBY.has(r.key)&&r.total).map(r=>({key:r.key,cod:r.cod||"",name:r.res,cat:r.cat,pel:r.cat==="Peligrosos"}));
+  const itemsDe=c=>CAT.filter(x=>x.cat===c).concat(fuera.filter(x=>x.cat===c));
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
-      CAT.filter(x=>x.cat===c).map(x=>`<tr><td class="c">${x.cod||"-"}</td><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("");
+      itemsDe(c).map(x=>`<tr><td class="c">${x.cod||"-"}</td><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("");
   }).join("")+`</table>`;
-  const pelItems=CAT.filter(x=>x.pel), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
+  const pelItems=CAT.filter(x=>x.pel).concat(fuera.filter(x=>x.pel)), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
   const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
     items.map(x=>`<tr><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("")+`</table>`;
   return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}">
