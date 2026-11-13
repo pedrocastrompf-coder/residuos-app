@@ -431,7 +431,8 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
 .lg h2{text-align:center;font-weight:700;color:var(--ink)}
 .lg #lg-msg{text-align:center;margin-bottom:6px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-@media print{.tabs{display:none!important} #app{padding-left:0!important} body{font-family:Arial,sans-serif}}
+@media print{.tabs{display:none!important} #app{padding-left:0!important;margin:0!important;background:#fff!important} html,body{background:#fff!important;font-family:Arial,sans-serif}
+  #v-desp,.off,.off table,.off td,.off th{background:#fff!important;box-shadow:none!important}}
 </style>
 </head>
 <body>
@@ -1523,7 +1524,8 @@ async function consultarDespacho(){
 /* hoja impresa con el diseño del SGA.R.G.001 (Vs 05) */
 function officialHTML(fecha,placa,filas,tipoRes){
   const kg=new Map(filas.map(r=>[r.key,r.total]));
-  const F0=CFG.FORMATO||{}, F=LS.get("pesaje.formato",null)||{codigo:F0.codigo,version:F0.version,aprobacion:F0.aprobacion};
+  const F0=CFG.FORMATO||{}, F=Object.assign({},LS.get("pesaje.formato",null)||{codigo:F0.codigo,version:F0.version,aprobacion:F0.aprobacion});
+  if(/^\d$/.test(String(F.version))) F.version="0"+F.version;     // el Sheet puede guardar «05» como número 5
   const w=x=>{ const v=kg.get(x.key); return v?fmt(v):"-"; };
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
