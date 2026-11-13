@@ -550,6 +550,7 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
   <section id="v-cat" class="hidden">
     <div class="card">
       <h2 id="c-tit">Nuevo residuo</h2>
+      <div class="muted">Catálogo corporativo: lo que se agregue o cambie aquí aplica a todas las plantas.</div>
       <label class="f" for="c-nom">Nombre del residuo</label>
       <input id="c-nom" class="in" autocomplete="off" placeholder="Ej.: Residuo vidrio">
       <label class="f" for="c-cat">Categoría (NTP 900.058:2019)</label>
@@ -566,7 +567,7 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
     <input id="c-q" class="in search" placeholder="Buscar residuo…" autocomplete="off">
     <div class="card"><div id="c-list" class="muted">Cargando…</div></div>
     <div class="card" id="f-card"><h2>Control de cambios del formato</h2>
-      <div class="muted">Cuadro que se imprime en el registro SGA.R.G.001 de <b id="f-planta"></b>.</div>
+      <div class="muted">Cuadro que se imprime en el registro SGA.R.G.001 de <b>todas las plantas</b> (gestión corporativa).<span id="f-planta" hidden></span></div>
       <div class="warnbox hidden" id="f-pend"></div>
       <div class="row3">
         <div><label class="f" for="f-cod">Código</label><input id="f-cod" class="in" autocomplete="off"></div>
@@ -745,7 +746,7 @@ async function cargaCatalogo(){
 /* ---------- almacenamiento local ---------- */
 /* cada planta guarda aparte sus datos locales (aprobaciones, catálogo, cola de despachos, vehículos…) */
 const BASE=CFG.PLANTA, PLK="pesaje.plantas", PLSEL="pesaje.planta";
-const LS_PLANTA=["pesaje.aprob","pesaje.catalogo","pesaje.formato","pesaje.despq","pesaje.placa","pesaje.puerta","pesaje.veh","pesaje.vehs"];
+const LS_PLANTA=["pesaje.aprob","pesaje.despq","pesaje.placa","pesaje.puerta","pesaje.veh","pesaje.vehs"];
 const lsk=k=>CFG.PLANTA!==BASE&&LS_PLANTA.includes(k)?k+"@"+CFG.PLANTA:k;
 const LS = {
   get(k,d){ try{ const v=localStorage.getItem(lsk(k)); return v?JSON.parse(v):d; }catch(e){ return d; } },
