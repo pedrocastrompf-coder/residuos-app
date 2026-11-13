@@ -1443,8 +1443,8 @@ function drawHoja(){
     return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
   }).join("")+`</div>`;
   $("#lista").innerHTML = html || `<div class="card muted">Sin resultados.</div>`;
-  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":(S?"✓ Terminé esta puerta":"Cerrar hoja y enviar"); b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(ajena(H)||(H.estado!=="cerrada"&&!H.pesadas.length))));
-  $("#b-back").textContent=S?"← Volver al camión":"← Hojas";
+  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":(S?"✓ Finalizar pesaje":"Cerrar hoja y enviar"); b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(ajena(H)||(H.estado!=="cerrada"&&!H.pesadas.length))));
+  $("#b-back").textContent=S?"← Atrás":"← Hojas";
 }
 
 async function cerrarGrupo(f,pl,v){
@@ -1550,7 +1550,7 @@ async function addPesada(){
   LS.set("pesaje.lastTu",f.tu);
   const edited=!!EDIT;
   await saveHoja(H);
-  resetForm(); drawSheet(); $("#f-bruto").focus(); toast(edited?"Pesada actualizada":"Pesada guardada");
+  resetForm(); closeSheet(); toast((edited?"Pesada actualizada":"Pesada guardada")+" · "+rec.res);
 }
 function editPesada(id){
   if(aprobada(H)) return toast("Despacho aprobado: edición bloqueada.");
