@@ -437,6 +437,7 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
 .umenu button:hover{background:#F6EFE8}.umenu #um-salir{color:var(--red)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .oleg{font-size:7pt;margin-top:4px;color:#333}.onm{display:flex;justify-content:space-between;align-items:baseline;gap:6px}.oun{white-space:nowrap;font-weight:normal;text-align:right}
+@media print{.off{zoom:var(--esc,1)}}
 @media print{.tabs{display:none!important} #app{padding-left:0!important;margin:0!important;background:#fff!important} html,body{background:#fff!important;font-family:Arial,sans-serif}
   #v-desp,.off,.off table,.off td,.off th{background:#fff!important;box-shadow:none!important}}
 </style>
@@ -1534,6 +1535,7 @@ async function consultarDespacho(){
   drawDespacho(fecha,placa,hojas,origen);
 }
 /* hoja impresa con el diseño del SGA.R.G.001 (Vs 05) */
+const OFF_CAP=38;   // filas de tabla que caben en una hoja A4 a escala 1 (con encabezado, observaciones y firmas)
 function officialHTML(fecha,placa,filas,tipoRes){
   const kg=new Map(filas.map(r=>[r.key,r.total]));
   const F0=CFG.FORMATO||{}, F=Object.assign({},LS.get("pesaje.formato",null)||{codigo:F0.codigo,version:F0.version,aprobacion:F0.aprobacion});
@@ -1554,7 +1556,12 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const pelItems=CAT.filter(x=>x.pel).concat(fuera.filter(x=>x.pel)), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
   const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
     items.map(x=>`<tr><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("")+`</table>`;
-  return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}">
+  // que el registro entre siempre en UNA hoja A4: si hay muchos residuos se reduce la escala de impresión
+  const C1=["Orgánico - producción","Orgánico - comedor","Plástico"], C2=["Madera","Papel y cartón","Metal","Vidrio","Otros aprovechables","No aprovechable","Especial"];
+  const filasDe=cats=>cats.reduce((a,c)=>a+1+itemsDe(c).reduce((k,x)=>k+(x.name.length>46?1.6:1),0),0);
+  const unidades=Math.max(filasDe(C1),filasDe(C2))+(pel?1+Math.ceil(pelItems.reduce((k,x)=>k+(x.name.length>52?1.6:1),0)/2):0);
+  const escala=Math.min(1,Math.round(OFF_CAP/unidades*100)/100);
+  return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}" style="--esc:${escala}">
     <table class="of ohead"><tr>
       <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
       <td rowspan="3" class="tit">CONTROL DE DESPACHO DE RESIDUOS SÓLIDOS</td>
