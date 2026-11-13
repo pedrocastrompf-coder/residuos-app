@@ -244,7 +244,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   .off .ocols>div{flex:1}
   .off .oh th{background:#fff}
   .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
-  .off .oobs{margin-top:8px} .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
+  .off .oobs{margin-top:8px} .off .osum{margin-bottom:3px} .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
   .off .osign{margin-top:10px}
 }
 .lg{position:fixed;inset:0;z-index:200;background:var(--brown);display:flex;align-items:center;justify-content:center;padding:18px}
@@ -1676,7 +1676,8 @@ function officialHTML(fecha,placa,filas,tipoRes){
     <div class="osec">RESIDUOS PELIGROSOS</div>
     <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
     ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UD: unidades</div>`:""}
-    <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td><span id="ph-obs"></span></td><td id="ph-prec"></td></tr></table>
+    <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td>${(()=>{ const ap=filas.filter(r=>r.cat!=="No aprovechable"&&r.cat!=="Peligrosos").reduce((a,r)=>a+(r.total||0),0), na=filas.filter(r=>r.cat==="No aprovechable"||r.cat==="Peligrosos").reduce((a,r)=>a+(r.total||0),0);
+      return `<div class="osum">• Residuos aprovechables: ${fmt(r2(ap))} kg<br>• Residuos no aprovechables: ${fmt(r2(na))} kg<br>• Total de residuos: ${fmt(r2(ap+na))} kg</div>`; })()}<span id="ph-obs"></span></td><td id="ph-prec"></td></tr></table>
     <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
   </div>`;
@@ -1783,6 +1784,7 @@ function cargarDesp(fecha,placa,srv){
     const s=aprob||!q ? (srv?{op:srv.empresa,cond:srv.conductor,brev:srv.brevete,hora:srv.hora,man:srv.manejoNP,manP:srv.manejoP,obs:srv.obs,prec:srv.precintos}:{})
                       : {op:q.empresa,cond:q.conductor,brev:q.brevete,hora:q.hora,man:q.manejoNP,manP:q.manejoP,obs:q.obs,prec:q.precintos};
     Object.keys(DESP).forEach(x=>DESP[x]=s[x]||"");
+    DESP.obs=DESP.obs.replace(/\n?Sin residuos en: [^\n]*/g,"").trim();   // ya no se anota la confirmación en Observaciones
   }
   DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn}:{estado:"Pendiente"};
 }
@@ -1822,9 +1824,6 @@ async function aprobarDesp(){
     if(pend) return err("Hay "+pend+" pesada"+(pend>1?"s":"")+" con tara pendiente. Completarlas antes de aprobar.");
     if(FALTAN.length){
       if(!$("#a-sinres").checked) return err("Faltan hojas en: "+FALTAN.join(", ")+". Crear la hoja o marcar la confirmación de que no hubo residuos.");
-      const nota="Sin residuos en: "+FALTAN.join(", ")+" (confirmado por "+nombre+").";
-      DESP.obs=(DESP.obs||"").replace(/\n?Sin residuos en: [^\n]*/g,"").trim(); DESP.obs=(DESP.obs?DESP.obs+"\n":"")+nota;
-      const po=$("#p-obs"); if(po) po.value=DESP.obs; const ho=$("#ph-obs"); if(ho) ho.textContent=DESP.obs; despChanged();
     }
     if(!DESP.op.trim()) return err("Falta la empresa operadora.");
     if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
