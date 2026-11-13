@@ -246,9 +246,11 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
   .off .oobs{margin-top:8px} .off .osum{margin-bottom:3px} .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
   .off .osign{margin-top:10px}
+  .off .onum{text-align:right;font-size:9pt;margin-top:4px}
 }
 .pdfw{position:absolute;left:-10000px;top:0;width:740px;background:#fff;color:#000;font-size:8pt;padding:4px}
 .pdfw .off{display:block;zoom:1!important}
+.pdfw .off .onum{text-align:right;font-size:9pt;margin-top:4px}
 .pdfw .off table{border-collapse:collapse;width:100%}
   .pdfw .off td,.pdfw .off th{border:1px solid #000;padding:2px 4px;font-size:7.5pt;line-height:1.25;color:#000}
   .pdfw .off th{background:#fff;font-weight:bold;text-align:center}
@@ -1669,7 +1671,7 @@ async function pdfDespacho(){
     const M=8, W=210-2*M, Hmax=297-2*M, r=Math.min(W/cv.width, Hmax/cv.height);   // siempre en UNA hoja A4
     pdf.addImage(cv.toDataURL("image/jpeg",0.92),"JPEG",M+(W-cv.width*r)/2,M,cv.width*r,cv.height*r);
     const [f,pl,v]=DKEY.split("|");
-    const nombre=`SGA.R.G.001 ${pl}${vj(v)>1?" viaje "+vj(v):""} ${fechaCorta(f).replace(/\//g,"-")} ${CFG.PLANTA}.pdf`;
+    const nombre=`SGA.R.G.001${DSTATE&&DSTATE.num?" N"+String(DSTATE.num).padStart(6,"0"):""} ${pl}${vj(v)>1?" viaje "+vj(v):""} ${fechaCorta(f).replace(/\//g,"-")} ${CFG.PLANTA}.pdf`;
     return {file:new File([pdf.output("blob")],nombre,{type:"application/pdf"}),texto:`Control de despacho de residuos sólidos (SGA.R.G.001) · ${CFG.PLANTA} · ${pl} · ${fechaCorta(f)}`,k:DKEY};
   } finally { w.remove(); }
 }
@@ -1700,12 +1702,12 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const hayUn=filas.some(r=>Object.values(r.uni||{}).some(v=>v));
   // residuos pesados que ya no están en el catálogo de la app (retirados o de otra lista): igual se imprimen en su categoría
   const fuera=filas.filter(r=>!CATBY.has(r.key)&&r.total).map(r=>({key:r.key,cod:r.cod||"",name:r.res,cat:r.cat,pel:r.cat==="Peligrosos"}));
-  const itemsDe=c=>CAT.filter(x=>x.cat===c).concat(fuera.filter(x=>x.cat===c));
-  const bloque=cats=>`<table class="of">`+cats.map(c=>{
+  const itemsDe=c=>CAT.filter(x=>x.cat===c).concat(fuera.filter(x=>x.cat===c)).filter(x=>(kg.get(x.key)||0)>0);   // solo se imprime lo pesado
+  const bloque=cats=>!cats.length?"":`<table class="of">`+cats.map(c=>{
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
-      itemsDe(c).map(x=>`<tr><td class="c">${x.cod||"-"}</td><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("");
+      itemsDe(c).map(x=>`<tr><td class="c">${esc(x.cod||"-")}</td><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("");
   }).join("")+`</table>`;
-  const pelItems=CAT.filter(x=>x.pel).concat(fuera.filter(x=>x.pel)), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
+  const pelItems=CAT.filter(x=>x.pel).concat(fuera.filter(x=>x.pel)).filter(x=>(kg.get(x.key)||0)>0), mitad=Math.ceil(pelItems.length/2), pel=pelItems.length>0;
   const colPel=items=>`<table class="of"><tr class="oh"><th>PELIGROSO</th><th style="width:17%">PESO (KG)</th></tr>`+
     items.map(x=>`<tr><td>${nom(x)}</td><td class="r">${w(x)}</td></tr>`).join("")+`</table>`;
   // que el registro entre siempre en UNA hoja A4: si hay muchos residuos se reduce la escala de impresión
@@ -1713,6 +1715,10 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const filasDe=cats=>cats.reduce((a,c)=>a+1+itemsDe(c).reduce((k,x)=>k+(x.name.length>46?1.6:1),0),0);
   const unidades=Math.max(filasDe(C1),filasDe(C2))+(pel?1+Math.ceil(pelItems.reduce((k,x)=>k+(x.name.length>52?1.6:1),0)/2):0);
   const escala=Math.min(1,Math.round(OFF_CAP/unidades*100)/100);
+  // no peligrosos: solo las categorías con algo pesado, repartidas en dos columnas parejas
+  const catsNP=C1.concat(C2).filter(c=>itemsDe(c).length), totNP=filasDe(catsNP); let acu=0; const colA=[], colB=[];
+  catsNP.forEach(c=>{ (acu<totNP/2?colA:colB).push(c); acu+=filasDe([c]); });
+  const numReg=DSTATE&&DSTATE.num?String(DSTATE.num).padStart(6,"0"):"";
   return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}" style="--esc:${escala}">
     <table class="of ohead"><tr>
       <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
@@ -1720,15 +1726,15 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <td style="width:15%"><b>Código:</b></td><td style="width:13%;text-align:center"><b>${esc(F.codigo||"SGA.R.G.001")}</b></td></tr>
       <tr><td><b>Versión:</b></td><td style="text-align:center"><b>${esc(F.version||"05")}</b></td></tr>
       <tr><td><b>Fecha de aprobación:</b></td><td style="text-align:center"><b>${esc(F.aprobacion||"")}</b></td></tr></table>
+    ${numReg?`<div class="onum">N.° de registro: <b>${numReg}</b></div>`:""}
     <table class="og">
       <tr><td><b>Fecha de registro:</b> ${fechaCorta(fecha)}</td><td><b>Empresa Operadora:</b> <span id="ph-op"></span></td><td><b>Sede:</b> ${esc(CFG.PLANTA)}</td></tr>
       <tr><td><b>Tipo de residuo:</b> ${esc(tipoRes)}</td><td><b>Conductor:</b> <span id="ph-cond"></span></td><td><b>Placa de vehículo:</b> ${esc(placa)}${DVIAJE>1?" · Viaje "+DVIAJE:""}</td></tr>
       <tr><td><b>Tipo de manejo:</b> <span id="ph-man"></span></td><td><b>Brevete:</b> <span id="ph-brev"></span></td><td><b>Hora de llegada:</b> <span id="ph-hora"></span></td></tr></table>
-    <div class="osec">RESIDUOS NO PELIGROSOS</div>
-    <div class="ocols"><div>${bloque(["Orgánico - producción","Orgánico - comedor","Plástico"])}</div>
-      <div>${bloque(["Madera","Papel y cartón","Metal","Vidrio","Otros aprovechables","No aprovechable","Especial"])}</div></div>
-    <div class="osec">RESIDUOS PELIGROSOS</div>
-    <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
+    ${catsNP.length?`<div class="osec">RESIDUOS NO PELIGROSOS</div>
+    <div class="ocols"><div>${bloque(colA)}</div><div>${bloque(colB)}</div></div>`:""}
+    ${pel?`<div class="osec">RESIDUOS PELIGROSOS</div>
+    <div class="ocols"><div>${colPel(pelItems.slice(0,mitad))}</div><div>${pelItems.length>1?colPel(pelItems.slice(mitad)):""}</div></div>`:""}
     ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UD: unidades</div>`:""}
     <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td>${(()=>{ const kgDe=f=>filas.filter(f).reduce((a,r)=>a+(r.total||0),0), ap=kgDe(r=>r.cat!=="No aprovechable"&&r.cat!=="Peligrosos"), na=kgDe(r=>r.cat==="No aprovechable"), pe=kgDe(r=>r.cat==="Peligrosos");
       const L=[["Residuos aprovechables",ap],["Residuos no aprovechables",na],["Residuos peligrosos",pe]].filter(x=>r2(x[1])>0).map(x=>`• ${x[0]}: ${fmt(r2(x[1]))} kg`);   // las líneas en 0 no se imprimen
@@ -1841,7 +1847,7 @@ function cargarDesp(fecha,placa,srv){
     Object.keys(DESP).forEach(x=>DESP[x]=s[x]||"");
     DESP.obs=DESP.obs.replace(/\n?Sin residuos en: [^\n]*/g,"").trim();   // ya no se anota la confirmación en Observaciones
   }
-  DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn}:{estado:"Pendiente"};
+  DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn,num:srv.numero}:{estado:"Pendiente"};
 }
 /* aprobación: pasa el despacho al Registro Interno del Google Sheet */
 let FALTAN=[];
@@ -1850,7 +1856,7 @@ function aprobHTML(hayPesadas,sinHoja){
   if(!hayPesadas) return "";
   if(!CFG.SCRIPT_URL) return `<div class="card noprint muted">Aprobación no disponible: configurar SCRIPT_URL y CLAVE en config.js.</div>`;
   const ap=DSTATE&&DSTATE.estado==="Aprobado";
-  const top=ap?`<div class="okbox">✔ Despacho aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
+  const top=ap?`<div class="okbox">✔ Despacho${DSTATE.num?" N.° <b>"+String(DSTATE.num).padStart(6,"0")+"</b>":""} aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
               :`<div class="muted">Estado: <b>Pendiente de aprobación</b>. Al aprobar, se registra en el Registro Interno y alimenta el dashboard.</div>`;
   return `<div class="card noprint" id="apr">${top}
     ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar despacho"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
