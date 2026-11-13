@@ -1856,8 +1856,8 @@ function aprobHTML(hayPesadas,sinHoja){
     ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
       <div class="muted" style="margin-top:6px">${ap?"Reabre":"Aprueba"}: <b>${esc(SES?SES.nombre:"")}</b> (queda registrado)</div>
-      <label class="f" for="a-clave">Ingrese su clave para ${ap?"reabrir":"aprobar"}</label>
-      <input id="a-clave" class="in" type="password" autocomplete="current-password" placeholder="Su contraseña">
+      ${ap?`<label class="f" for="a-clave">Ingrese su clave para reabrir</label>
+      <input id="a-clave" class="in" type="password" autocomplete="current-password" placeholder="Su contraseña">`:""}
       <div class="row2" style="margin-top:8px"><button class="btn sec" id="a-cancel">Cancelar</button><button class="btn" id="a-ok">${ap?"Reabrir":"Aprobar"}</button></div>
       <div id="a-err" class="warnbox hidden"></div>
     </div></div>`;
@@ -1881,7 +1881,7 @@ async function aprobarDesp(){
     if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
     if(!precArr().length) return err("Faltan los precintos.");
   }
-  const clave=$("#a-clave").value; if(!clave) return err("Ingrese su clave para confirmar.");
+  const clave=$("#a-clave")?$("#a-clave").value:""; if(modo==="reabrir"&&!clave) return err("Ingrese su clave para confirmar.");   // aprobar ya no pide clave
   const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
   try{
     clearTimeout(dT);
