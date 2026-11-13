@@ -1560,7 +1560,7 @@ $("#hh-rok").addEventListener("click",reabrirDesdeHoja);
 
 /* ---------- administración del catálogo (Inspector y Administrador) ---------- */
 let CATADM=[], CATAD_EDIT=null, CATAD_META={categorias:[],manejos:[]};
-const ERR_CAT={nombre_invalido:"Ingrese el nombre del residuo (hasta 120 caracteres).",categoria_invalida:"Elija una categoría de la lista.",codigo_invalido:"Código SAP inválido: use solo letras, números, punto o guion (máx. 20).",nombre_existe:"Ya existe un residuo con ese nombre.",manejo_invalido:"Elija el manejo.",permiso:"Su rol no permite esta acción."};
+const ERR_CAT={nombre_base:"El nombre de los residuos originales no se cambia.",no_existe:"El residuo ya no existe en el catálogo. Recargue la lista.",nombre_invalido:"Ingrese el nombre del residuo (hasta 120 caracteres).",categoria_invalida:"Elija una categoría de la lista.",codigo_invalido:"Código SAP inválido: use solo letras, números, punto o guion (máx. 20).",nombre_existe:"Ya existe un residuo con ese nombre.",manejo_invalido:"Elija el manejo.",permiso:"Su rol no permite esta acción."};
 function catFormReset(){
   CATAD_EDIT=null; $("#c-tit").textContent="Nuevo residuo"; $("#c-nom").value=""; $("#c-nom").readOnly=false; $("#c-cod").value=""; $("#c-act").checked=true; $("#c-err").textContent="";
   $("#c-nota").textContent=""; $("#c-cancel").classList.add("hidden"); $("#c-man").disabled=false;
@@ -1603,10 +1603,10 @@ async function drawCatAdm(){
 }
 function catEditar(name){
   const r=CATADM.find(x=>x.name===name); if(!r) return;
-  CATAD_EDIT=name; $("#c-tit").textContent="Editar residuo"; $("#c-nom").value=r.name; $("#c-nom").readOnly=true; $("#c-cat").value=r.cat; $("#c-cod").value=r.cod||"";
+  CATAD_EDIT=name; $("#c-tit").textContent="Editar residuo"; $("#c-nom").value=r.name; $("#c-nom").readOnly=!!r.base; $("#c-cat").value=r.cat; $("#c-cod").value=r.cod||"";
   const m=[...$("#c-man").options].some(o=>o.value===r.manejo); if(m) $("#c-man").value=r.manejo;
   $("#c-man").disabled=!!r.base; $("#c-act").checked=r.activo; $("#c-err").textContent="";
-  $("#c-nota").textContent="El nombre no se cambia: si ya se usó, perdería su historial. Para renombrar, cree uno nuevo y retire este."+(r.base?" El manejo de los residuos originales ya está definido en Data.":"")+" Cambiar la categoría reclasifica el residuo en Data.";
+  $("#c-nota").textContent=(r.base?"El nombre de los residuos originales no se cambia (es la columna histórica del Registro Interno). El manejo ya está definido en Data.":"Si cambia el nombre, se actualiza también su columna del Registro Interno, sus filas en Data y las pesadas ya registradas.")+" Cambiar la categoría reclasifica el residuo en Data.";
   $("#c-cancel").classList.remove("hidden"); $("#c-nom").scrollIntoView({behavior:"smooth",block:"center"});
 }
 /* cuadro del formato SGA.R.G.001: el Inspector decide si un cambio del catálogo amerita nueva versión */
@@ -1635,13 +1635,17 @@ async function formatoOp(body,msg){
 }
 async function catGuardar(extra){
   const e=$("#c-err"); e.textContent="";
-  const b=Object.assign({key:CFG.CLAVE,action:"catalogo_guardar",name:$("#c-nom").value.trim(),cat:$("#c-cat").value,cod:$("#c-cod").value.trim(),manejo:CATAD_EDIT?"":$("#c-man").value,activo:$("#c-act").checked},extra||{});
+  const b=Object.assign({key:CFG.CLAVE,action:"catalogo_guardar",name:$("#c-nom").value.trim(),cat:$("#c-cat").value,cod:$("#c-cod").value.trim(),manejo:CATAD_EDIT?"":$("#c-man").value,activo:$("#c-act").checked},CATAD_EDIT?{renombrar:CATAD_EDIT}:{},extra||{});
   if(!b.name) return void(e.textContent=ERR_CAT.nombre_invalido);
   if(!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
   const bt=$("#c-save"); bt.disabled=true; bt.textContent="Guardando…";
   try{
     const j=await postJ(b,60000);
     if(!j||!j.ok) return void(e.textContent=ERR_CAT[j&&j.error]||"No se pudo guardar ("+((j&&j.error)||"error")+").");
+    if(b.renombrar&&b.renombrar!==b.name){                       // las pesadas de este equipo pasan al nombre nuevo
+      const k0="n:"+fold(b.renombrar);
+      for(const h of HOJAS){ let c=false; (h.pesadas||[]).forEach(p=>{ if(p.res===b.renombrar){ p.res=b.name; if(p.key===k0) p.key=b.cod?String(b.cod):"n:"+fold(b.name); c=true; } }); if(c) await DB.put(h); }
+    }
     toast((j.nuevo?"Residuo agregado: ya está disponible en la app.":"Residuo actualizado.")+(j.formato?" Revise el control de cambios del formato.":"")); catFormReset(); await drawCatAdm(); cargaCatalogo();
     if(j.formato) $("#f-card").scrollIntoView({behavior:"smooth",block:"center"});
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
