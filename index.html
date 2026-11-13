@@ -247,6 +247,24 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   .off .oobs{margin-top:8px} .off .osum{margin-bottom:3px} .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
   .off .osign{margin-top:10px}
 }
+.pdfw{position:absolute;left:-10000px;top:0;width:740px;background:#fff;color:#000;font-size:8pt;padding:4px}
+.pdfw .off{display:block;zoom:1!important}
+.pdfw .off table{border-collapse:collapse;width:100%}
+  .pdfw .off td,.pdfw .off th{border:1px solid #000;padding:2px 4px;font-size:7.5pt;line-height:1.25;color:#000}
+  .pdfw .off th{background:#fff;font-weight:bold;text-align:center}
+  .pdfw .off .c{text-align:center;width:19%}
+  .pdfw .off .r{text-align:right}
+  .pdfw .off .ohead .tit{text-align:center;font-weight:bold;font-size:10.5pt}
+  .pdfw .off .og{margin-top:6px}
+  .pdfw .off .og td{border:0;padding:3px 2px;font-size:8pt;width:33%}
+  .pdfw .off .osec{font-weight:bold;font-size:8pt;margin:8px 0 3px}
+  .pdfw .off .ocols{display:flex;gap:8px;align-items:flex-start}
+  .pdfw .off .ocols>div{flex:1}
+  .pdfw .off .oh th{background:#fff}
+  .pdfw .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
+  .pdfw .off .oobs{margin-top:8px} .pdfw .off .osum{margin-bottom:3px} .pdfw .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
+  .pdfw .off .osign{margin-top:10px}
+
 .lg{position:fixed;inset:0;z-index:200;background:var(--brown);display:flex;align-items:center;justify-content:center;padding:18px}
 .lg .box{background:#fff;border-radius:16px;padding:20px 18px;width:100%;max-width:380px}
 .lg h2{margin:0 0 2px;font-size:18px}
@@ -1303,9 +1321,11 @@ function drawOp(){
         const sub=h?`${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}${h.estado==="cerrada"?" · terminada":" · en curso"}${aj?" · "+esc(h.responsable):""}`:"Sin pesar todavía";
         return `<button class="door ${h?(h.estado==="cerrada"?"ce":"has"):""} ${aj?"lock":""}" data-door="${esc(p)}"><span><b>${esc(p)}</b><small>${sub}</small></span><span class="go">›</span></button>`; }).join("")}</div>
       ${(()=>{ const vac=c.hojas.filter(h=>!(h.pesadas||[]).length&&!ajena(h)&&can("borrarHoja")); return vac.length?`<div style="margin:4px 0 10px">${vac.map(h=>`<span class="xh" data-delh="${h.id}">✕ eliminar hoja vacía de ${esc(h.puerta)}</span>`).join(" ")}</div>`:""; })()}
-      ${(()=>{ const con=c.hojas.filter(h=>(h.pesadas||[]).length), listo=con.length&&con.every(h=>h.estado==="cerrada"); return listo&&can("aprobar")?`<button class="btn xl" data-gdesp="${esc(c.k)}">Generar despacho</button><div class="muted" style="text-align:center;margin:8px 0 14px">Revise los datos, complete manejo y precintos, y apruebe.</div>`:""; })()}
-      <button class="btn xl" data-op="fin">Terminé con este camión</button>
-      <div class="muted" style="text-align:center;margin-top:8px">Al terminar, sus hojas se cierran y se envían.</div>`;
+      ${(()=>{ const con=c.hojas.filter(h=>(h.pesadas||[]).length), listo=con.length&&con.every(h=>h.estado==="cerrada");
+        // orden: primero se termina el pesado; recién entonces se genera el registro de despacho
+        return listo
+          ? (can("aprobar")?`<button class="btn xl" data-gdesp="${esc(c.k)}">Generar registro de despacho</button><div class="muted" style="text-align:center;margin-top:8px">Revise los datos, complete manejo y precintos, y apruebe.</div>`:"")
+          : `<button class="btn xl" data-op="fin">Terminar con el pesado de residuos</button><div class="muted" style="text-align:center;margin-top:8px">Al terminar, sus hojas se cierran y se envían.</div>`; })()}`;
     return;
   }
   box.innerHTML=`<button class="btn xl" data-op="nuevo" style="margin-top:6px">＋ Iniciar despacho</button>
@@ -1634,6 +1654,40 @@ async function consultarDespacho(){
 }
 /* hoja impresa con el diseño del SGA.R.G.001 (Vs 05) */
 const OFF_CAP=38;   // filas de tabla que caben en una hoja A4 a escala 1 (con encabezado, observaciones y firmas)
+/* compartir el formato aprobado como PDF (WhatsApp u otra app) con el menú de compartir del equipo */
+let PDFLISTO=null;
+const cargaJS=src=>new Promise((ok,no)=>{ if(document.querySelector(`script[src="${src}"]`)&&window.__js&&window.__js[src]) return ok(); const e=document.createElement("script"); e.src=src; e.onload=()=>{ (window.__js=window.__js||{})[src]=1; ok(); }; e.onerror=()=>no(new Error("lib")); document.head.appendChild(e); });
+async function pdfDespacho(){
+  await cargaJS("lib/html2canvas.min.js");
+  await cargaJS("lib/jspdf.umd.min.js");
+  const src=document.querySelector("#d-out .off"); if(!src) throw new Error("sin formato");
+  const w=document.createElement("div"); w.className="pdfw"; w.appendChild(src.cloneNode(true)); document.body.appendChild(w);
+  try{
+    await Promise.all([...w.querySelectorAll("img")].map(i=>i.complete?0:new Promise(r=>{ i.onload=i.onerror=r; })));
+    const cv=await html2canvas(w,{scale:2,backgroundColor:"#fff",useCORS:true,logging:false});
+    const pdf=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:"portrait"});
+    const M=8, W=210-2*M, Hmax=297-2*M, r=Math.min(W/cv.width, Hmax/cv.height);   // siempre en UNA hoja A4
+    pdf.addImage(cv.toDataURL("image/jpeg",0.92),"JPEG",M+(W-cv.width*r)/2,M,cv.width*r,cv.height*r);
+    const [f,pl,v]=DKEY.split("|");
+    const nombre=`SGA.R.G.001 ${pl}${vj(v)>1?" viaje "+vj(v):""} ${fechaCorta(f).replace(/\//g,"-")} ${CFG.PLANTA}.pdf`;
+    return {file:new File([pdf.output("blob")],nombre,{type:"application/pdf"}),texto:`Control de despacho de residuos sólidos (SGA.R.G.001) · ${CFG.PLANTA} · ${pl} · ${fechaCorta(f)}`,k:DKEY};
+  } finally { w.remove(); }
+}
+async function compartirPDF(btn){
+  if(!(DSTATE&&DSTATE.estado==="Aprobado")) return toast("Solo se comparten despachos aprobados.");
+  const txt0="Compartir PDF (WhatsApp)";
+  try{
+    if(!PDFLISTO||PDFLISTO.k!==DKEY){ btn.disabled=true; btn.textContent="Preparando PDF…"; PDFLISTO=await pdfDespacho(); btn.disabled=false; }
+    const P=PDFLISTO;
+    if(navigator.canShare&&navigator.canShare({files:[P.file]})){
+      try{ await navigator.share({files:[P.file],title:P.file.name,text:P.texto}); btn.textContent=txt0; }
+      catch(e){ if(e&&e.name==="NotAllowedError"){ btn.textContent="PDF listo · toque para enviar"; } else btn.textContent=txt0; }   // el equipo pide otro toque
+      return;
+    }
+    const a=document.createElement("a"); a.href=URL.createObjectURL(P.file); a.download=P.file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    btn.textContent=txt0; toast("Este equipo no permite compartir archivos: se descargó el PDF para adjuntarlo en WhatsApp.");
+  }catch(e){ btn.disabled=false; btn.textContent=txt0; toast("No se pudo generar el PDF. Reintente."); }
+}
 function officialHTML(fecha,placa,filas,tipoRes){
   const kg=new Map(filas.map(r=>[r.key,r.total]));
   const F0=CFG.FORMATO||{}, F=Object.assign({},LS.get("pesaje.formato",null)||{codigo:F0.codigo,version:F0.version,aprobacion:F0.aprobacion});
@@ -1729,7 +1783,7 @@ function drawDespacho(fecha,placa,hojas,origen){
       <tfoot><tr><td>TOTAL</td>${tp.map(v=>`<td class="num">${fmt(v)}</td>`).join("")}<td class="num">${fmt(gt)}</td><td></td></tr></tfoot></table></div>`
       :`<div class="card muted">Sin pesadas para la fecha y placa indicadas.</div>`}
     ${filas.length?(DSTATE&&DSTATE.estado==="Aprobado"
-      ?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button></div>`
+      ?`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print">Imprimir / guardar PDF (formato SGA.R.G.001)</button><button class="btn" id="d-share" style="margin-top:8px;background:#1F7A43">Compartir PDF (WhatsApp)</button></div>`
       :`<div class="noprint" style="margin-top:10px"><button class="btn sec" id="d-print" disabled style="opacity:.5">Imprimir / guardar PDF (formato SGA.R.G.001)</button><div class="muted" style="margin-top:4px">🔒 Impresión habilitada solo para despachos aprobados.</div></div>`):""}
     ${officialHTML(fecha,placa,filas,tipoRes)}`;
   // los datos del despacho se copian a la hoja impresa y se envían al Google Sheet
@@ -2144,6 +2198,7 @@ document.addEventListener("click",e=>{
   if(t.closest("[data-tn]")){ TARA={t:"none"}; $("#f-otra").value=""; drawTaras(); drawPrev(); $("#f-bruto").focus(); return; }
   const ed=t.closest("[data-edit]"); if(ed){ editPesada(ed.dataset.edit); return; }
   const dl=t.closest("[data-del]"); if(dl){ delPesada(dl.dataset.del,dl); return; }
+  if(t.closest("#d-share")){ compartirPDF(t.closest("#d-share")); return; }
   if(t.closest("#d-print")){ if(!(DSTATE&&DSTATE.estado==="Aprobado")) return toast("Impresión habilitada solo para despachos aprobados."); window.print(); return; }
   if(t.closest("#a-open")){ $("#a-box").classList.remove("hidden"); t.closest("#a-open").classList.add("hidden"); return; }
   if(t.closest("#a-cancel")){ $("#a-box").classList.add("hidden"); $("#a-open").classList.remove("hidden"); return; }
