@@ -244,6 +244,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
   .off .ocols>div{flex:1}
   .off .oh th{background:#fff}
   .off .obs{border:1px solid #000;margin-top:8px;padding:4px 5px;min-height:46px;font-size:8pt}
+  .off .oobs{margin-top:8px} .off .oobs td{height:46px;vertical-align:top;font-size:8pt;white-space:pre-line}
   .off .osign{margin-top:10px}
 }
 .lg{position:fixed;inset:0;z-index:200;background:var(--brown);display:flex;align-items:center;justify-content:center;padding:18px}
@@ -519,6 +520,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
 @media(max-width:520px){ .kpi{padding-right:16px} .kpi[class*="ki-"]::before,.kpi[class*="ki-"]::after{display:none} }
 #pl-sel{min-height:40px;padding:6px 32px 6px 12px;font-size:15px;font-weight:650;border-radius:10px;margin-top:4px;-webkit-appearance:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23623C21' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center/14px;box-shadow:0 1px 2px rgba(43,33,24,.08)}
 #pl-sel:focus-visible{outline:2px solid var(--ring,#6ABF4B);outline-offset:2px}
+.precs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 @media(prefers-reduced-motion:reduce){.tabs,#app,.navcol::before{transition:none!important}}
 .umenu{position:fixed;z-index:70;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(43,33,24,.16);padding:6px;display:flex;flex-direction:column}
 .umenu .umh{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
@@ -1672,7 +1674,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
     <div class="osec">RESIDUOS PELIGROSOS</div>
     <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
     ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UD: unidades</div>`:""}
-    <div class="obs"><b>OBSERVACIONES:</b> <span id="ph-obs"></span></div>
+    <table class="of oobs"><tr class="oh"><th style="width:73%">OBSERVACIONES</th><th>PRECINTOS</th></tr><tr><td><span id="ph-obs"></span></td><td id="ph-prec"></td></tr></table>
     <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
   </div>`;
@@ -1713,6 +1715,9 @@ function drawDespacho(fecha,placa,hojas,origen){
       <select id="p-man" class="in"><option value="">— elegir —</option>${MANEJOS.map(([c,t])=>`<option value="${c}">${esc(t)} (${c})</option>`).join("")}</select>`:""}
       ${HP?`<label class="f" for="p-manp">Tipo de manejo (peligrosos)</label>
       <select id="p-manp" class="in"><option value="">— elegir —</option>${MANEJOS.map(([c,t])=>`<option value="${c}">${esc(t)} (${c})</option>`).join("")}</select>`:""}
+      <label class="f" for="p-prec0">Precintos</label>
+      <div id="p-prec" class="precs"></div>
+      <button type="button" class="btn sec sm" id="p-prec-add" style="margin-top:6px">+ Agregar precinto</button>
       <label class="f" for="p-obs">Observaciones</label>
       <textarea id="p-obs" class="in" rows="2"></textarea>
     </div>
@@ -1735,10 +1740,22 @@ function drawDespacho(fecha,placa,hojas,origen){
     inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; phMan(); despChanged(); });
   });
   phMan();
+  drawPrec(!!bloq||!can("manejo"));
 }
+/* precintos: varios por unidad despachada; se guardan como lista separada por comas */
+const precArr=()=>String(DESP.prec||"").split(/[,;\n]/).map(x=>x.trim()).filter(Boolean);
+function drawPrec(dis){
+  const box=$("#p-prec"); if(!box) return;
+  const a=precArr(), n=Math.max(4,a.length+(dis?0:0));
+  box.innerHTML=Array.from({length:n},(_,i)=>`<input id="p-prec${i}" class="in" autocomplete="off" inputmode="text" placeholder="N.° ${i+1}" value="${esc(a[i]||"")}"${dis?" disabled":""}>`).join("");
+  const add=$("#p-prec-add"); if(add){ add.classList.toggle("hidden",dis); add.onclick=()=>{ const k=box.children.length; box.insertAdjacentHTML("beforeend",`<input id="p-prec${k}" class="in" autocomplete="off" placeholder="N.° ${k+1}">`); box.lastElementChild.focus(); }; }
+  box.oninput=()=>{ DESP.prec=[...box.querySelectorAll("input")].map(x=>x.value.trim().replace(/[,;]/g," ")).filter(Boolean).join(", "); phPrec(); despChanged(); };
+  phPrec();
+}
+function phPrec(){ const o=$("#ph-prec"); if(o) o.innerHTML=precArr().map(esc).join("<br>"); }
 const MANEJOS=[["COM-DIS","Comercialización - Disposición final"],["COM","Comercialización"],["DIS","Disposición final"],["DON","Donación (Aniquem)"],["VAL","Valorización"],["TRA","Tratamiento"],["VAL-DIS","Valorización - Disposición final"],["TRA-VAL-DIS","Tratamiento - Valorización - Disp. final"]];
 const MLBL=Object.fromEntries(MANEJOS);
-const DESP={op:"",cond:"",brev:"",hora:"",man:"",manP:"",obs:""};
+const DESP={op:"",cond:"",brev:"",hora:"",man:"",manP:"",obs:"",prec:""};
 let DVIAJE=1, DKEY="", DSTATE=null, DSRV=null, HP=false, HN=false, DHOJAS=[], DFILAS=[];
 function manTxt(){
   const a=MLBL[DESP.man]||"", b=MLBL[DESP.manP]||"";
@@ -1747,7 +1764,7 @@ function manTxt(){
 }
 function despPayload(){
   const [fecha,placa,vv]=DKEY.split("|"), viaje=vj(vv);
-  return {key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje,empresa:DESP.op,conductor:DESP.cond,brevete:DESP.brev,hora:DESP.hora,manejoNP:DESP.man,manejoP:DESP.manP,obs:DESP.obs};
+  return {key:CFG.CLAVE,action:"despacho",sede:CFG.PLANTA,fecha,placa,viaje,empresa:DESP.op,conductor:DESP.cond,brevete:DESP.brev,hora:DESP.hora,manejoNP:DESP.man,manejoP:DESP.manP,obs:DESP.obs,precintos:DESP.prec};
 }
 let dT;
 function despChanged(){
@@ -1761,8 +1778,8 @@ function cargarDesp(fecha,placa,srv){
   const aprob=srv&&srv.estado==="Aprobado";
   if(k!==DKEY||aprob){
     DKEY=k; const q=LS.get(DESPQ,{})[k];
-    const s=aprob||!q ? (srv?{op:srv.empresa,cond:srv.conductor,brev:srv.brevete,hora:srv.hora,man:srv.manejoNP,manP:srv.manejoP,obs:srv.obs}:{})
-                      : {op:q.empresa,cond:q.conductor,brev:q.brevete,hora:q.hora,man:q.manejoNP,manP:q.manejoP,obs:q.obs};
+    const s=aprob||!q ? (srv?{op:srv.empresa,cond:srv.conductor,brev:srv.brevete,hora:srv.hora,man:srv.manejoNP,manP:srv.manejoP,obs:srv.obs,prec:srv.precintos}:{})
+                      : {op:q.empresa,cond:q.conductor,brev:q.brevete,hora:q.hora,man:q.manejoNP,manP:q.manejoP,obs:q.obs,prec:q.precintos};
     Object.keys(DESP).forEach(x=>DESP[x]=s[x]||"");
   }
   DSTATE=srv?{estado:srv.estado||"Pendiente",por:srv.aprobadoPor,en:srv.aprobadoEn}:{estado:"Pendiente"};
@@ -1810,6 +1827,7 @@ async function aprobarDesp(){
     if(!DESP.op.trim()) return err("Falta la empresa operadora.");
     if(HN&&!DESP.man) return err("Falta el tipo de manejo"+(HP?" (no peligrosos)":"")+".");
     if(HP&&!DESP.manP) return err("Falta el tipo de manejo (peligrosos).");
+    if(!precArr().length) return err("Faltan los precintos.");
   }
   const clave=$("#a-clave").value; if(!clave) return err("Ingrese su clave para confirmar.");
   const bt=$("#a-ok"); bt.disabled=true; bt.textContent="Enviando…";
