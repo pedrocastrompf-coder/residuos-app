@@ -710,7 +710,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
       <label class="f" for="u-clv">Contraseña temporal</label>
       <div style="display:flex;gap:8px"><input id="u-clv" class="in" autocomplete="off" spellcheck="false"><button class="btn sec sm2" id="u-gen" type="button">Generar</button></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px"><input type="checkbox" id="u-cambiar" checked> Exigir que cambie la contraseña en su primer ingreso (recomendado)</label>
-      <div class="muted" style="margin-top:6px"><b>Operador:</b> registra pesajes. <b>Inspector:</b> además completa el manejo, aprueba despachos y administra el catálogo. <b>Administrador:</b> todo, incluidos los usuarios.</div>
+      <div class="muted" style="margin-top:6px"><b>Operador:</b> pesa, completa manejo y precintos, aprueba e imprime despachos. <b>Inspector:</b> además reabre despachos y administra catálogo, formato y plantas. <b>Administrador:</b> todo, incluidos usuarios y bitácora.</div>
       <div class="err" id="u-err"></div>
       <div style="height:10px"></div>
       <button class="btn" id="u-crear">Crear perfil</button>
@@ -868,9 +868,9 @@ const AUTH=!!CFG.SCRIPT_URL;                // sin Google Sheet conectado la app
 let SES=LS.get(SESK,null);
 if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
 const tok=()=>SES?SES.token:"";
-const PERM={aprobar:["Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Inspector","Administrador"],borrarHoja:["Inspector","Administrador"],catalogo:["Inspector","Administrador"],plantas:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
+const PERM={aprobar:["Operador","Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Operador","Inspector","Administrador"],borrarHoja:["Operador","Inspector","Administrador"],catalogo:["Inspector","Administrador"],plantas:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"]};
 const SIMPLE=()=>AUTH&&!!SES&&SES.rol==="Operador";
-const SUPERV=()=>AUTH&&!!SES&&SES.rol==="Inspector";   // el Inspector supervisa: no pesa, abre en Despacho
+const SUPERV=()=>false;   // el Inspector ya pesa: usa la misma vista que el Administrador   // el Inspector supervisa: no pesa, abre en Despacho
 const can=p=>!AUTH||(!!SES&&(PERM[p]||[]).includes(SES.rol));
 const ajena=h=>AUTH&&!!SES&&SES.rol==="Operador"&&!!h.usuario&&h.usuario!==SES.usuario;
 async function gj(r){ const j=await r.json(); sesionErr(j); return j; }
@@ -1055,7 +1055,7 @@ function showView(){
   if(TAB==="cat"&&!can("catalogo")) TAB="hoja";
   if(TAB==="pla"&&!can("plantas")) TAB="hoja";
   if(TAB==="act"&&!can("actividad")) TAB="hoja";
-  if(TAB==="desp"&&SIMPLE()) TAB="hoja";
+  if(TAB==="desp"&&SIMPLE()&&!$("#d-placa").value) TAB="hoja";   // el Operador entra al despacho solo desde su camión
   if(TAB==="hoja"&&SUPERV()&&!H){ TAB="desp"; entraDesp(); }
   const inHoja = TAB==="hoja" && H, simple=SIMPLE();
   if(inHoja) drawHoja();
@@ -1071,7 +1071,7 @@ function showView(){
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
   const tOn=document.querySelector(".tab.on");      // título de la sección en uso (solo presentación)
-  $("#ptitle").textContent = inHoja ? (SIMPLE()?"Pesaje":"Hoja de pesaje") : (SIMPLE()?"Pesaje de residuos":(tOn?tOn.textContent.trim():"Gestión de residuos sólidos"));
+  $("#ptitle").textContent = (TAB==="desp"&&SIMPLE()) ? "Despacho" : inHoja ? (SIMPLE()?"Pesaje":"Hoja de pesaje") : (SIMPLE()?"Pesaje de residuos":(tOn?tOn.textContent.trim():"Gestión de residuos sólidos"));
   window.scrollTo(0,0);
 }
 
@@ -1302,6 +1302,8 @@ function drawOp(){
       <div class="doors">${CFG.PUERTAS.map(p=>{ const h=hojaDe(c,p), aj=h&&ajena(h);
         const sub=h?`${fmt(kgHoja(h))} kg · ${(h.pesadas||[]).length} pesada${(h.pesadas||[]).length===1?"":"s"}${h.estado==="cerrada"?" · terminada":" · en curso"}${aj?" · "+esc(h.responsable):""}`:"Sin pesar todavía";
         return `<button class="door ${h?(h.estado==="cerrada"?"ce":"has"):""} ${aj?"lock":""}" data-door="${esc(p)}"><span><b>${esc(p)}</b><small>${sub}</small></span><span class="go">›</span></button>`; }).join("")}</div>
+      ${(()=>{ const vac=c.hojas.filter(h=>!(h.pesadas||[]).length&&!ajena(h)&&can("borrarHoja")); return vac.length?`<div style="margin:4px 0 10px">${vac.map(h=>`<span class="xh" data-delh="${h.id}">✕ eliminar hoja vacía de ${esc(h.puerta)}</span>`).join(" ")}</div>`:""; })()}
+      ${(()=>{ const con=c.hojas.filter(h=>(h.pesadas||[]).length), listo=con.length&&con.every(h=>h.estado==="cerrada"); return listo&&can("aprobar")?`<button class="btn xl" data-gdesp="${esc(c.k)}">Generar despacho</button><div class="muted" style="text-align:center;margin:8px 0 14px">Revise los datos, complete manejo y precintos, y apruebe.</div>`:""; })()}
       <button class="btn xl" data-op="fin">Terminé con este camión</button>
       <div class="muted" style="text-align:center;margin-top:8px">Al terminar, sus hojas se cierran y se envían.</div>`;
     return;
@@ -1735,7 +1737,7 @@ function drawDespacho(fecha,placa,hojas,origen){
   const phMan=()=>{ $("#ph-man").textContent=manTxt(); };
   Object.keys(map).forEach(k=>{
     const inp=$("#"+map[k]); if(!inp) return;
-    inp.value=DESP[k]||""; inp.disabled=!!bloq||((k==="man"||k==="manP"||k==="obs")&&!can("manejo"))||(["op","cond","brev","hora"].includes(k)&&!!DESP[k]&&!(SES&&SES.rol==="Administrador"));
+    inp.value=DESP[k]||""; inp.disabled=!!bloq||((k==="man"||k==="manP"||k==="obs")&&!can("manejo"))||(["op","cond","brev","hora"].includes(k)&&false);   // los datos del vehículo los puede corregir cualquier rol
     const out=$("#ph-"+k); if(out) out.textContent=DESP[k]||"";
     inp.addEventListener("input",()=>{ DESP[k]=inp.value; const o=$("#ph-"+k); if(o) o.textContent=inp.value; phMan(); despChanged(); });
   });
@@ -2132,7 +2134,7 @@ document.addEventListener("click",e=>{
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
   const gd=t.closest("[data-gdesp]"); if(gd){ const [f,pl,vv]=gd.dataset.gdesp.split("|"); $("#d-fecha").value=f; $("#d-placa").value=pl; $("#d-viaje").value=vj(vv); TAB="desp"; showView(); if(CFG.SCRIPT_URL&&navigator.onLine) toast("Consultando el Google Sheet…"); consultarDespacho().then(()=>window.scrollTo({top:0})); return; }
-  if(t.closest("#d-back")){ modoDetalle(false); drawHojas(); window.scrollTo({top:0}); return; }
+  if(t.closest("#d-back")){ modoDetalle(false); if(SIMPLE()){ DKEY=""; $("#d-placa").value=""; TAB="hoja"; OP={v:"inicio",k:null}; showView(); return; } drawHojas(); window.scrollTo({top:0}); return; }
   const sc=t.closest("[data-svcerrar]"); if(sc){ const h=HOJAS.find(x=>x.id===sc.dataset.svcerrar); if(h&&h.estado!=="cerrada"&&confirm("¿Cerrar la hoja de "+h.puerta+" de "+h.responsable+"?\nSi esa persona sigue pesando, tendrá que reabrirla.")){ h.estado="cerrada"; saveHoja(h).then(()=>{ drawHojas(); toast("Hoja cerrada."); }); } return; }
   const dh=t.closest("[data-delh]"); if(dh&&can("borrarHoja")){ const h=HOJAS.find(x=>x.id===dh.dataset.delh); if(h&&!(h.pesadas||[]).length&&confirm("¿Eliminar la hoja vacía de "+h.puerta+" ("+h.placa+")?")){ dh.classList.add("busy"); borrarHojaVacia(h); } return; }
   const op=t.closest("[data-open]"); if(op){ openHoja(op.dataset.open); return; }
