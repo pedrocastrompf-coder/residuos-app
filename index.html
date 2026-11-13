@@ -1997,7 +1997,7 @@ document.addEventListener("click",e=>{
   const gc=t.closest("[data-gcerrar]"); if(gc){ const [f,pl,vv]=gc.dataset.gcerrar.split("|"); cerrarGrupo(f,pl,+vv); return; }
   if(t.closest("#q-now")){ sync(); refrescaDia(); return; }
   const vh=t.closest("[data-vh]"); if(vh){ $("#n-placa").value=vh.dataset.vh; viajeOk=null; syncVeh(); return; }
-  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp") entraDesp(); if(TAB==="usr") drawUsuarios(); if(TAB==="pla"){ drawPlantas(); cargaPlantas(); } if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
+  const tab=t.closest("[data-tab]"); if(tab){ TAB=tab.dataset.tab; if(TAB==="desp"){ entraDesp(); cargaCatalogo(); } if(TAB==="usr") drawUsuarios(); if(TAB==="pla"){ drawPlantas(); cargaPlantas(); } if(TAB==="cat") drawCatAdm(); if(TAB==="act") drawActividad(); showView(); return; }
   const pu=t.closest("[data-p]"); if(pu&&pu.parentElement.id==="n-puerta"){ selPuerta=pu.dataset.p; $$("#n-puerta button").forEach(b=>b.classList.toggle("on",b===pu)); return; }
   if(t.closest("#b-new")){ openNew(); if($("#n-card").classList.contains("open")) $("#n-card").scrollIntoView({behavior:"smooth",block:"start"}); return; }
   const np=t.closest("[data-newp]"); if(np){ const [p,f,pl,vv]=np.dataset.newp.split("|"); selPuerta=p; $("#n-fecha").value=f; $("#n-placa").value=pl; TAB="hoja"; H=null; showView(); drawHome(); openNew(true); startHoja(vv); return; }
