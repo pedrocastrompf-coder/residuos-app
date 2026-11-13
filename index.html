@@ -359,6 +359,7 @@ input[type=checkbox]{accent-color:var(--brown);width:17px;height:17px}
 .btn:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
 .btn.xl{min-height:60px;font-size:18px;border-radius:12px}
 .btn.sm,.btn.sm2{border-radius:9px}
+.btn.sec.del{color:var(--red);border-color:#F0B8B2}.btn.sec.del:hover{background:var(--red-bg)}
 .ib{border:1.5px solid var(--line2);border-radius:9px}
 
 /* despachos */
@@ -1966,7 +1967,7 @@ async function drawUsuarios(){
       <div class="acts"><select class="in" data-urol="${esc(u.usuario)}">${["Operador","Inspector","Administrador"].map(r=>`<option${r===u.rol?" selected":""}>${r}</option>`).join("")}</select>
       <button class="btn sec sm2" data-unom="${esc(u.usuario)}">Cambiar nombre</button>
       <button class="btn sec sm2" data-ures="${esc(u.usuario)}">Resetear contraseña</button>
-      <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
+      <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button>${SES&&SES.usuario!==u.usuario?`<button class="btn sec sm2 del" data-udel="${esc(u.usuario)}">Eliminar</button>`:""}</div></div>`).join("")||"Sin usuarios.";
   }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
 }
 async function drawActividad(){
@@ -2079,7 +2080,9 @@ $("#pl-list").addEventListener("click",ev=>{
   if(ac){ const n=ac.dataset.plact, p=PLANTAS.find(x=>x.planta===n); if(p&&confirm((p.activo!==false?"¿Desactivar la planta ":"¿Activar la planta ")+n+"?"+(p.activo!==false?"\nSus registros se conservan en su Google Sheet.":""))) plaOp({action:"planta_editar",planta:n,activo:p.activo===false},p.activo!==false?"Planta desactivada.":"Planta activada."); }
 });
 $("#u-list").addEventListener("click",ev=>{
-  const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]"), nm=ev.target.closest("[data-unom]");
+  const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]"), nm=ev.target.closest("[data-unom]"), dl=ev.target.closest("[data-udel]");
+  if(dl){ const u=dl.dataset.udel, x=USRS.find(z=>z.usuario===u);
+    if(x&&confirm("¿Eliminar el perfil de "+x.nombre+" ("+u+")?\nYa no podrá ingresar. Lo que registró se conserva.\nEsta acción no se puede deshacer.")) usrOp({action:"usuario_borrar",usuario:u},"Perfil eliminado."); return; }
   if(nm){ const u=nm.dataset.unom, x=USRS.find(z=>z.usuario===u); const n=prompt("Nombre y apellido de "+u+":",x?x.nombre:"");
     if(n===null) return; const t=n.trim().replace(/\s+/g," "); if(t.split(" ").length<2) return toast("Ingrese nombre y apellido.");
     usrOp({action:"usuario_editar",usuario:u,nombre:t},"Nombre actualizado."+(SES&&SES.usuario===u?" Se verá al volver a iniciar sesión.":"")); return; }
