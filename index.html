@@ -647,6 +647,10 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
     <div class="noprint" id="d-list"></div>
     <details class="card noprint" id="d-consult">
       <summary style="cursor:pointer;font-weight:700;color:var(--brown)">Buscar despacho de otro día</summary>
+      <label class="f" for="d-num">N.° de registro</label>
+      <div style="display:flex;gap:8px"><input id="d-num" class="in" type="text" inputmode="numeric" autocomplete="off" placeholder="Ej.: 000123" style="flex:1"><button class="btn" id="d-numgo" type="button" style="width:auto;padding:0 18px">Buscar</button></div>
+      <div class="err" id="d-numerr"></div>
+      <div class="muted" style="margin:12px 0 0;text-align:center">— o por fecha —</div>
       <div class="muted" style="margin-top:6px">Elija la fecha y verá los despachos de ese día. La placa y el viaje son opcionales: sirven solo para acotar la búsqueda.</div>
       <div class="row2">
         <div><label class="f" for="d-fecha">Fecha</label><input id="d-fecha" type="date" class="in"></div>
@@ -1612,6 +1616,20 @@ function buildDespacho(hojas){
   return {porPuerta,filas};
 }
 /* búsqueda por fecha (placa y viaje opcionales): lista los despachos de ese día */
+/* búsqueda por N.° de registro: el «DNI» del despacho */
+async function buscarPorNumero(){
+  const e=$("#d-numerr"), n=parseInt(($("#d-num").value||"").replace(/\D/g,""),10); e.textContent="";
+  if(!n) return void(e.textContent="Escriba el N.° de registro.");
+  if(!CFG.SCRIPT_URL||!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
+  const bt=$("#d-numgo"); bt.disabled=true;
+  try{
+    const j=await getJ({action:"buscar_numero",numero:n});
+    if(!j||!j.ok) return void(e.textContent=j&&j.error==="no_existe"?"No hay un despacho con el N.° "+String(n).padStart(6,"0")+" en "+CFG.PLANTA+".":"No se pudo buscar. Reintente.");
+    $("#d-fecha").value=j.fecha; $("#d-placa").value=j.placa; $("#d-viaje").value=j.viaje; $("#d-num").value="";
+    return consultarDespacho();
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet. Reintente."; }
+  finally{ bt.disabled=false; }
+}
 async function buscarDespachos(){
   const fecha=$("#d-fecha").value, pl=normPlaca($("#d-placa").value), vtxt=$("#d-viaje").value.trim(), e=$("#d-err"), R=$("#d-res"), bt=$("#d-go"); e.textContent=""; R.innerHTML="";
   if(!fecha) return void(e.textContent="Seleccione la fecha.");
@@ -2274,6 +2292,8 @@ $("#f-uni").addEventListener("input",drawPrev);
 $("#f-otra").addEventListener("input",()=>{ TARA={t:"val",v:num($("#f-otra").value)}; drawTaras(); drawPrev(); });
 $("#f-bruto").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addPesada(); } });
 $("#d-go").addEventListener("click",buscarDespachos);
+$("#d-numgo").addEventListener("click",buscarPorNumero);
+$("#d-num").addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); buscarPorNumero(); } });
 $("#n-placa").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase(); viajeOk=null; syncVeh(); });
 $("#n-fecha").addEventListener("change",syncVeh);
 ["#n-emp","#n-cond","#n-brev"].forEach(i=>$(i).addEventListener("input",()=>{ $(i).dataset.auto="0"; }));
