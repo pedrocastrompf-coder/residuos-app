@@ -250,6 +250,7 @@ table.d tfoot td{font-weight:bold;background:var(--sand)}
 .lg h2{margin:0 0 2px;font-size:18px}
 .lg img{height:44px;display:block;margin:0 auto 10px}
 .lg .err{margin-top:8px}
+.row3{display:grid;grid-template-columns:1.4fr .8fr 1.2fr;gap:8px}@media(max-width:480px){.row3{grid-template-columns:1fr 1fr}.row3>div:first-child{grid-column:1/-1}}
 .plchk{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}.plchk label{display:flex;gap:6px;align-items:center}
 #pl-sel{font:inherit;color:inherit;background:transparent;border:1px solid rgba(255,255,255,.55);border-radius:6px;padding:2px 6px;max-width:100%}#pl-sel option{color:#222}
 textarea.in{min-height:0;font:inherit;resize:vertical}
@@ -393,9 +394,18 @@ textarea.in{min-height:0;font:inherit;resize:vertical}
     </div>
     <input id="c-q" class="in search" placeholder="Buscar residuo…" autocomplete="off">
     <div class="card"><div id="c-list" class="muted">Cargando…</div></div>
-    <div class="card"><h2>Control de cambios del archivo <span class="bdg ap" id="c-ver"></span></h2>
-      <div class="muted" id="c-verinfo">Cada residuo nuevo agrega una columna al Registro Interno y sube la versión del archivo de esta planta.</div>
-      <div id="c-cambios" class="muted" style="margin-top:6px"></div></div>
+    <div class="card" id="f-card"><h2>Control de cambios del formato</h2>
+      <div class="muted">Cuadro que se imprime en el registro SGA.R.G.001 de <b id="f-planta"></b>.</div>
+      <div class="warnbox hidden" id="f-pend"></div>
+      <div class="row3">
+        <div><label class="f" for="f-cod">Código</label><input id="f-cod" class="in" autocomplete="off"></div>
+        <div><label class="f" for="f-ver">Versión</label><input id="f-ver" class="in" autocomplete="off"></div>
+        <div><label class="f" for="f-apr">Fecha de aprobación</label><input id="f-apr" class="in" autocomplete="off" placeholder="dd/mm/aaaa" inputmode="numeric"></div>
+      </div>
+      <label class="f" for="f-mot">Motivo del cambio</label><input id="f-mot" class="in" autocomplete="off" placeholder="Ej.: se agregó un residuo">
+      <div class="err" id="f-err"></div>
+      <div class="row2" style="margin-top:8px"><button class="btn sec hidden" id="f-desc">No amerita cambio</button><button class="btn" id="f-save">Guardar versión</button></div>
+      <details style="margin-top:10px"><summary class="muted">Historial de versiones</summary><div id="f-hist" class="muted" style="margin-top:6px"></div></details></div>
   </section>
 
   <!-- PLANTAS Y LUGARES DE DESPACHO (Inspector y Administrador) -->
@@ -556,6 +566,7 @@ async function cargaCatalogo(){
   try{
     const r=await fetchT(`${CFG.SCRIPT_URL}?action=catalogo&sede=${encodeURIComponent(CFG.PLANTA)}&key=${encodeURIComponent(CFG.CLAVE)}&token=${encodeURIComponent(tok())}`,{redirect:"follow"},30000);
     const j=await gj(r);
+    if(j&&j.ok&&j.formato) LS.set("pesaje.formato",j.formato);
     if(j&&j.ok&&j.residuos&&j.residuos.length){ LS.set(CATK,j.residuos); setCat(j.residuos); if(H&&TAB==="hoja") drawHoja(); }
   }catch(e){}
 }
@@ -563,7 +574,7 @@ async function cargaCatalogo(){
 /* ---------- almacenamiento local ---------- */
 /* cada planta guarda aparte sus datos locales (aprobaciones, catálogo, cola de despachos, vehículos…) */
 const BASE=CFG.PLANTA, PLK="pesaje.plantas", PLSEL="pesaje.planta";
-const LS_PLANTA=["pesaje.aprob","pesaje.catalogo","pesaje.despq","pesaje.placa","pesaje.puerta","pesaje.veh","pesaje.vehs"];
+const LS_PLANTA=["pesaje.aprob","pesaje.catalogo","pesaje.formato","pesaje.despq","pesaje.placa","pesaje.puerta","pesaje.veh","pesaje.vehs"];
 const lsk=k=>CFG.PLANTA!==BASE&&LS_PLANTA.includes(k)?k+"@"+CFG.PLANTA:k;
 const LS = {
   get(k,d){ try{ const v=localStorage.getItem(lsk(k)); return v?JSON.parse(v):d; }catch(e){ return d; } },
@@ -1343,7 +1354,7 @@ async function consultarDespacho(){
 /* hoja impresa con el diseño del SGA.R.G.001 (Vs 05) */
 function officialHTML(fecha,placa,filas,tipoRes){
   const kg=new Map(filas.map(r=>[r.key,r.total]));
-  const F=CFG.FORMATO||{};
+  const F0=CFG.FORMATO||{}, F=LS.get("pesaje.formato",null)||{codigo:F0.codigo,version:F0.version,aprobacion:F0.aprobacion};
   const w=x=>{ const v=kg.get(x.key); return v?fmt(v):"-"; };
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
     return `<tr class="oh"><th style="width:19%;white-space:nowrap">CÓDIGO SAP</th><th>${esc(c.toUpperCase())}</th><th style="width:17%">PESO (KG)</th></tr>`+
@@ -1587,9 +1598,7 @@ async function drawCatAdm(){
     $("#c-cat").innerHTML=j.categorias.map(c=>`<option>${esc(c)}</option>`).join(""); $("#c-man").innerHTML=j.manejos.map(c=>`<option>${esc(c)}</option>`).join("");
     if(sc) $("#c-cat").value=sc; if(sm) $("#c-man").value=sm;
     drawCatList();
-    const fh=t=>{ const d=new Date(t); return isNaN(d)?esc(String(t)):new Intl.DateTimeFormat("es-PE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false,timeZone:CFG.ZONA_HORARIA}).format(d); };
-    $("#c-ver").textContent=j.version?"Versión "+j.version+" · "+CFG.PLANTA:"";
-    $("#c-cambios").innerHTML=(j.cambios||[]).map(c=>`<div class="arow"><b>v${esc(String(c.version))} · ${esc(c.cambio)}</b>${esc(c.detalle||"")}<div class="muted">${fh(c.fecha)} · ${esc(c.usuario)}</div></div>`).join("")||"Sin cambios registrados.";
+    drawFormato(j);
   }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
 }
 function catEditar(name){
@@ -1600,6 +1609,30 @@ function catEditar(name){
   $("#c-nota").textContent="El nombre no se cambia: si ya se usó, perdería su historial. Para renombrar, cree uno nuevo y retire este."+(r.base?" El manejo de los residuos originales ya está definido en Data.":"")+" Cambiar la categoría reclasifica el residuo en Data.";
   $("#c-cancel").classList.remove("hidden"); $("#c-nom").scrollIntoView({behavior:"smooth",block:"center"});
 }
+/* cuadro del formato SGA.R.G.001: el Inspector decide si un cambio del catálogo amerita nueva versión */
+let FMTPEND=[];
+function hoyDMY(){ const [y,m,d]=todayStr().split("-"); return `${d}/${m}/${y}`; }
+function drawFormato(j){
+  if(!j.formato) return void $("#f-card").classList.add("hidden");
+  $("#f-card").classList.remove("hidden"); $("#f-planta").textContent=CFG.PLANTA; $("#f-err").textContent="";
+  LS.set("pesaje.formato",j.formato); FMTPEND=j.formatoPend||[];
+  const p=$("#f-pend"); p.classList.toggle("hidden",!FMTPEND.length); $("#f-desc").classList.toggle("hidden",!FMTPEND.length);
+  if(FMTPEND.length){
+    p.innerHTML=`<b>El formato cambió.</b> ¿Amerita nueva versión?<ul style="margin:4px 0 0 18px;padding:0">${FMTPEND.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>`;
+    $("#f-cod").value=j.formato.codigo; $("#f-ver").value=j.formatoSig||j.formato.version; $("#f-apr").value=hoyDMY(); $("#f-mot").value=FMTPEND.join(" · ");
+  } else { $("#f-cod").value=j.formato.codigo; $("#f-ver").value=j.formato.version; $("#f-apr").value=j.formato.aprobacion; $("#f-mot").value=""; }
+  const fh=t=>{ const d=new Date(t); return isNaN(d)?esc(String(t)):new Intl.DateTimeFormat("es-PE",{day:"2-digit",month:"2-digit",year:"numeric",timeZone:CFG.ZONA_HORARIA}).format(d); };
+  $("#f-hist").innerHTML=(j.formatoHist||[]).map(h=>`<div class="arow"><b>${h.estado==="Vigente"?"Versión "+esc(h.version)+" · aprobada "+esc(h.aprobacion):h.estado==="Aplicado"?"Cambio incluido en la versión siguiente":"Sin cambio de versión (v"+esc(h.version)+")"}</b>${esc(h.motivo)}<div class="muted">${fh(h.registrado)} · ${esc(h.usuario)}</div></div>`).join("")||"Sin cambios registrados.";
+}
+const ERR_FMT={codigo_invalido:"Código inválido.",version_invalida:"Versión inválida.",fecha_invalida:"Fecha de aprobación: use dd/mm/aaaa.",permiso:"No tiene permiso para esta acción."};
+async function formatoOp(body,msg){
+  const e=$("#f-err"); e.textContent="";
+  if(!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
+  try{ const j=await postJ(Object.assign({key:CFG.CLAVE},body),60000);
+    if(!j||!j.ok) return void(e.textContent=ERR_FMT[j&&j.error]||"No se pudo guardar ("+((j&&j.error)||"error")+").");
+    toast(msg); await drawCatAdm();
+  }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
+}
 async function catGuardar(extra){
   const e=$("#c-err"); e.textContent="";
   const b=Object.assign({key:CFG.CLAVE,action:"catalogo_guardar",name:$("#c-nom").value.trim(),cat:$("#c-cat").value,cod:$("#c-cod").value.trim(),manejo:CATAD_EDIT?"":$("#c-man").value,activo:$("#c-act").checked},extra||{});
@@ -1609,7 +1642,8 @@ async function catGuardar(extra){
   try{
     const j=await postJ(b,60000);
     if(!j||!j.ok) return void(e.textContent=ERR_CAT[j&&j.error]||"No se pudo guardar ("+((j&&j.error)||"error")+").");
-    toast(j.nuevo?"Residuo agregado: ya está disponible en la app.":"Residuo actualizado."); catFormReset(); await drawCatAdm(); cargaCatalogo();
+    toast((j.nuevo?"Residuo agregado: ya está disponible en la app.":"Residuo actualizado.")+(j.formato?" Revise el control de cambios del formato.":"")); catFormReset(); await drawCatAdm(); cargaCatalogo();
+    if(j.formato) $("#f-card").scrollIntoView({behavior:"smooth",block:"center"});
   }catch(x){ e.textContent="Sin conexión con el Google Sheet."; }
   finally{ bt.disabled=false; bt.textContent="Guardar"; }
 }
@@ -1818,6 +1852,10 @@ $("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-
     usrOp({action:"usuario_editar",usuario:u,plantas:L},"Plantas actualizadas."); } });
 $("#sub").addEventListener("change",ev=>{ if(ev.target.id==="pl-sel") cambiaPlanta(ev.target.value); });
 $("#pl-crear").addEventListener("click",crearPlanta);
+$("#f-save").addEventListener("click",()=>{ const a=$("#f-apr").value.trim();
+  if(!/^\d{2}\/\d{2}\/\d{4}$/.test(a)) return void($("#f-err").textContent=ERR_FMT.fecha_invalida);
+  formatoOp({action:"formato_guardar",codigo:$("#f-cod").value.trim(),version:$("#f-ver").value.trim(),aprobacion:a,motivo:$("#f-mot").value.trim()},"Formato actualizado: versión "+$("#f-ver").value.trim()+"."); });
+$("#f-desc").addEventListener("click",()=>{ if(confirm("¿El cambio no amerita nueva versión del formato?\nSe mantiene la versión vigente y queda constancia en el historial.")) formatoOp({action:"formato_descartar",motivo:""},"Se mantiene la versión vigente."); });
 $("#pl-list").addEventListener("click",ev=>{
   const sv=ev.target.closest("[data-plsave]"), ac=ev.target.closest("[data-plact]");
   if(sv){ const n=sv.dataset.plsave, ta=[...$("#pl-list").querySelectorAll("[data-pllug]")].find(x=>x.dataset.pllug===n), lug=lugTxt(ta.value); if(!lug.length) return toast(ERR_PLA.lugares_invalidos); plaOp({action:"planta_editar",planta:n,lugares:lug},"Lugares de despacho actualizados."); }
