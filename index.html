@@ -1293,7 +1293,7 @@ function drawOp(){
     const c=lista.find(x=>x.k===OP.k);
     if(!c){ OP={v:"inicio",k:null}; return drawOp(); }
     const d=c.d||{}, multi=c.viaje>1;
-    box.innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
+    box.innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Atrás</button></div>
       <div class="card"><div class="tk" style="border:0;padding:0;margin:0;background:none"><div class="p">${esc(c.placa)}${multi?`<span class="bdg ab">Viaje ${c.viaje}</span>`:""}</div>
       <div class="m">${esc(d.empresa||"")}${d.conductor?" · "+esc(d.conductor):""}${horaTxt(d.hora)?" · llegó "+esc(horaTxt(d.hora)):""}</div></div></div>
       <div class="opt">¿En qué puerta lo va a pesar?</div>
@@ -1314,7 +1314,7 @@ function drawOp(){
 function drawOpNuevo(){
   OP={v:"nuevo",k:null};
   const placas=[...new Set(CFG.PLACAS.concat(Object.keys(LS.get(VEHS,{}))))];
-  $("#op-body").innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Camiones</button></div>
+  $("#op-body").innerHTML=`<div style="margin:6px 0"><button class="btn sec sm" data-op="inicio">← Atrás</button></div>
     <div class="card opf"><h2>Iniciar despacho</h2>
       <label class="f" for="op-placa">Placa del vehículo</label>
       <input id="op-placa" class="in placa" list="dl-op" autocapitalize="characters" autocomplete="off" placeholder="ABZ-937"><datalist id="dl-op">${placas.map(p=>`<option value="${esc(p)}">`).join("")}</datalist>
