@@ -793,7 +793,8 @@ function totales(h,key){
     if(p.uni) o.uni[p.tu||"UD"]=(o.uni[p.tu||"UD"]||0)+p.uni; });
   return o;
 }
-const uniTxt = u=>Object.keys(u).map(k=>`${fmt(u[k])} ${k}`).join(" · ");
+const uab = k=>k==="UD"?"UND":k;          // abreviatura que se muestra (el dato guardado sigue siendo "UD")
+const uniTxt = u=>Object.keys(u).map(k=>`${fmt(u[k])} ${uab(k)}`).join(" · ");
 const kgHoja = h=>r2((h.pesadas||[]).reduce((a,p)=>a+netoDe(p),0));
 const pendHoja = h=>(h.pesadas||[]).filter(p=>p.taraPend).length;
 // una hoja vacía que nunca se envió no se manda al Sheet (así no queda como "abierta" bloqueando la aprobación)
@@ -1382,7 +1383,7 @@ function openSheet(key){
   if(H.estado==="cerrada") return toast("Hoja cerrada. Reabrir para editar.");
   EDIT=null;
   $("#sh-name").textContent=CUR.name; $("#sh-sap").textContent=CUR.cod?"SAP "+CUR.cod:"Sin código SAP";
-  $("#f-tu").innerHTML=CFG.UNIDADES.map(([c,n])=>`<option value="${c}">${esc(n)} (${c})</option>`).join("");
+  $("#f-tu").innerHTML=CFG.UNIDADES.map(([c,n])=>`<option value="${c}">${esc(n)} (${uab(c)})</option>`).join("");
   TARA = {t:"none"};            // por defecto: «Sin tara» seleccionado; el operario toca un peso solo si usa coche
   $("#f-tu").value=LS.get("pesaje.lastTu",CFG.UNIDADES[0][0]);
   resetForm(); drawSheet(); $("#sheet").classList.remove("hidden");
@@ -1424,7 +1425,7 @@ function drawSheet(){
     const p=x.p, n=netoDe(p);
     const calc = p.taraPend ? `${fmt(p.bruto)} kg bruto` : (p.tara? `${fmt(p.bruto)} − ${fmt(p.tara)} = ${fmt(n)} kg` : `${fmt(n)} kg (sin tara)`);
     return `<li class="${EDIT===p.id?"ed":""}"><span class="muted">${j+1}</span>
-      <div class="k ${p.taraPend?"pd":""}"><b>${p.taraPend?fmt(p.bruto):fmt(n)} kg</b>${p.uni?` · ${p.uni} ${p.tu||"UD"}`:""}<small>${p.taraPend?"⚠ Tara pendiente · ":""}${calc}</small></div>
+      <div class="k ${p.taraPend?"pd":""}"><b>${p.taraPend?fmt(p.bruto):fmt(n)} kg</b>${p.uni?` · ${p.uni} ${uab(p.tu||"UD")}`:""}<small>${p.taraPend?"⚠ Tara pendiente · ":""}${calc}</small></div>
       <button class="ib" data-edit="${p.id}" aria-label="Editar">✎</button>
       <button class="ib del" data-del="${p.id}" aria-label="Borrar">🗑</button></li>`;
   }).join("") : `<li class="muted" style="justify-content:center">Sin pesadas registradas para este residuo.</li>`;
@@ -1530,7 +1531,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
   const w=x=>{ const v=kg.get(x.key); return v?fmt(v):"-"; };
   // bolsas, cajas o unidades del residuo: pegadas a la derecha de la celda del nombre
   const UN=new Map(filas.map(r=>[r.key,r.uni||{}]));
-  const un=x=>{ const u=UN.get(x.key)||{}; const t=Object.keys(u).filter(k=>u[k]).map(k=>fmt(u[k])+" "+k).join(" · "); return t?`<span class="oun">${esc(t)}</span>`:""; };
+  const un=x=>{ const u=UN.get(x.key)||{}; const t=Object.keys(u).filter(k=>u[k]).map(k=>fmt(u[k])+" "+uab(k)).join(" · "); return t?`<span class="oun">${esc(t)}</span>`:""; };
   const nom=x=>`<div class="onm"><span>${esc(x.name)}</span>${un(x)}</div>`;
   const hayUn=filas.some(r=>Object.values(r.uni||{}).some(v=>v));
   const bloque=cats=>`<table class="of">`+cats.map(c=>{
@@ -1556,7 +1557,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <div>${bloque(["Madera","Papel y cartón","Metal","Vidrio","Otros aprovechables","No aprovechable","Especial"])}</div></div>
     <div class="osec">RESIDUOS PELIGROSOS</div>
     <div class="ocols"><div>${pel?colPel(pelItems.slice(0,mitad)):""}</div><div>${pel?colPel(pelItems.slice(mitad)):""}</div></div>
-    ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UD: unidades</div>`:""}
+    ${hayUn?`<div class="oleg">B: bolsas · C: cajas · UND: unidades</div>`:""}
     <div class="obs"><b>OBSERVACIONES:</b> <span id="ph-obs"></span></div>
     <table class="of osign"><tr class="oh"><th>ENCARGADO DEL DESPACHO DE RESIDUOS</th><th>ENCARGADO DE ALMACÉN</th><th>ENCARGADO DE SECURITY</th></tr>
       <tr><td>Nombre:</td><td>Nombre:</td><td>Nombre:</td></tr><tr><td>DNI:</td><td>DNI:</td><td>DNI:</td></tr><tr><td style="height:46px;vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td><td style="vertical-align:top">Firma:</td></tr></table>
