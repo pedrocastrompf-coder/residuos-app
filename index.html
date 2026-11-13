@@ -155,7 +155,7 @@ body.superv [data-tab="hoja"]{display:none}
 .crow{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--line);border-top:0;padding:10px 12px}
 .crow .n small{display:block;color:var(--gray);font-size:11.5px;margin-top:2px}
 .crow .acts{display:flex;gap:8px}
-.crow.off2{opacity:.6}
+.crow.off2,.plchk .off2{opacity:.6}
 .bw .crow:last-child{border-radius:0 0 10px 10px}
 .bsub{font-size:12px;font-weight:bold;color:var(--gray);margin:8px 2px 3px;text-transform:uppercase}
 .bw .rrow:last-child{border-radius:0 0 10px 10px}
@@ -434,7 +434,7 @@ textarea.in{min-height:0;font:inherit;resize:vertical}
         <div><label class="f" for="u-usr">Usuario</label><input id="u-usr" class="in" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Ej.: alopez"></div>
         <div><label class="f" for="u-rol">Rol</label><select id="u-rol" class="in"><option>Operador</option><option>Inspector</option><option>Administrador</option></select></div>
       </div>
-      <div id="u-plbox" class="hidden"><label class="f">Plantas en las que trabaja</label><div id="u-plantas" class="plchk"></div></div>
+      <div id="u-plbox" class="hidden"><label class="f">Alcance: plantas en las que trabaja</label><div id="u-plantas" class="plchk"></div></div>
       <label class="f" for="u-clv">Contraseña temporal</label>
       <div style="display:flex;gap:8px"><input id="u-clv" class="in" autocomplete="off" spellcheck="false"><button class="btn sec sm2" id="u-gen" type="button">Generar</button></div>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px"><input type="checkbox" id="u-cambiar" checked> Exigir que cambie la contraseña en su primer ingreso (recomendado)</label>
@@ -1750,7 +1750,7 @@ let USRS=[];
 function drawUsrPlantas(){
   const A=plantasAct(), box=$("#u-plantas"), prev=new Set([...box.querySelectorAll("input:checked")].map(i=>i.value));
   $("#u-plbox").classList.toggle("hidden",A.length<2);
-  box.innerHTML=A.map(p=>`<label><input type="checkbox" value="${esc(p.planta)}"${(prev.size?prev.has(p.planta):p.planta===CFG.PLANTA)?" checked":""}> ${esc(p.planta)}</label>`).join("");
+  box.innerHTML=`<label><input type="checkbox" value="*"${prev.has("*")?" checked":""}> <b>Todas</b> <span class="muted">(incluye las que se creen después)</span></label>`+A.map(p=>`<label><input type="checkbox" value="${esc(p.planta)}"${(prev.size?prev.has(p.planta):p.planta===CFG.PLANTA)?" checked":""}> ${esc(p.planta)}</label>`).join("");
 }
 async function drawUsuarios(){
   drawUsrPlantas();
@@ -1762,7 +1762,8 @@ async function drawUsuarios(){
     USRS=j.usuarios;
     L.innerHTML=USRS.map(u=>`<div class="urow"><div class="nm">${esc(u.nombre)} <span class="bdg ${u.activo?"ap":"inact"}">${u.activo?"activo":"desactivado"}</span>${u.cambiar?' <span class="bdg q">clave temporal</span>':""}</div>
       <div class="muted">${esc(u.usuario)}</div>
-      ${plantasAct().length>1?`<div class="plchk" style="margin-top:6px">${u.rol==="Administrador"?'<span class="muted">Todas las plantas</span>':plantasAct().map(p=>`<label><input type="checkbox" data-upl="${esc(u.usuario)}" value="${esc(p.planta)}"${(u.plantas||[]).includes(p.planta)?" checked":""}> ${esc(p.planta)}</label>`).join("")}</div>`:""}
+      ${plantasAct().length>1?`<div class="plchk" style="margin-top:6px"><span class="muted">Alcance:</span>${u.rol==="Administrador"?'<b>Todas las plantas</b>':(()=>{ const tod=(u.plantas||[]).includes("*");
+        return `<label><input type="checkbox" data-upl="${esc(u.usuario)}" value="*"${tod?" checked":""}> <b>Todas</b></label>`+plantasAct().map(p=>`<label class="${tod?"off2":""}"><input type="checkbox" data-upl="${esc(u.usuario)}" value="${esc(p.planta)}"${tod||(u.plantas||[]).includes(p.planta)?" checked":""}${tod?" disabled":""}> ${esc(p.planta)}</label>`).join(""); })()}</div>`:""}
       <div class="acts"><select class="in" data-urol="${esc(u.usuario)}">${["Operador","Inspector","Administrador"].map(r=>`<option${r===u.rol?" selected":""}>${r}</option>`).join("")}</select>
       <button class="btn sec sm2" data-ures="${esc(u.usuario)}">Resetear contraseña</button>
       <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
@@ -1791,7 +1792,7 @@ async function crearUsuario(){
   if(!/^[a-z0-9._]{3,30}$/.test(usuario)) return void(e.textContent=ERR_USR.usuario_invalido);
   if(clave.length<4) return void(e.textContent=ERR_USR.clave_corta);
   const body={key:CFG.CLAVE,action:"usuario_crear",nombre,usuario,rol,clave,cambiar:$("#u-cambiar").checked};
-  if(plantasAct().length>1){ body.plantas=[...$("#u-plantas").querySelectorAll("input:checked")].map(i=>i.value); if(!body.plantas.length&&rol!=="Administrador") return void(e.textContent="Marque al menos una planta."); if(!body.plantas.length) body.plantas=[CFG.PLANTA]; }
+  if(plantasAct().length>1){ body.plantas=[...$("#u-plantas").querySelectorAll("input:checked")].map(i=>i.value); if(body.plantas.includes("*")) body.plantas=["*"]; if(!body.plantas.length&&rol!=="Administrador") return void(e.textContent="Marque al menos una planta."); if(!body.plantas.length) body.plantas=[CFG.PLANTA]; }
   const j=await postJ(body,30000).catch(()=>null);
   if(!j) return void(e.textContent="Sin conexión con el Google Sheet.");
   if(!j.ok) return void(e.textContent=ERR_USR[j.error]||"No se pudo crear ("+j.error+").");
@@ -1851,7 +1852,8 @@ $("#chip-u").addEventListener("click",()=>openCta(false));
 $("#u-gen").addEventListener("click",()=>{ $("#u-clv").value=claveAzar(); });
 $("#u-crear").addEventListener("click",crearUsuario);
 $("#u-list").addEventListener("change",ev=>{ const sel=ev.target.closest("[data-urol]"); if(sel) return void usrOp({action:"usuario_editar",usuario:sel.dataset.urol,rol:sel.value},"Rol actualizado.");
-  const pl=ev.target.closest("[data-upl]"); if(pl){ const u=pl.dataset.upl, L=[...$("#u-list").querySelectorAll("[data-upl]")].filter(i=>i.dataset.upl===u&&i.checked).map(i=>i.value);
+  const pl=ev.target.closest("[data-upl]"); if(pl){ const u=pl.dataset.upl, todas=[...$("#u-list").querySelectorAll("[data-upl]")].find(i=>i.dataset.upl===u&&i.value==="*");
+    const L=todas&&todas.checked?["*"]:[...$("#u-list").querySelectorAll("[data-upl]")].filter(i=>i.dataset.upl===u&&i.checked&&i.value!=="*").map(i=>i.value);
     if(!L.length){ pl.checked=true; return toast("Cada usuario necesita al menos una planta."); }
     usrOp({action:"usuario_editar",usuario:u,plantas:L},"Plantas actualizadas."); } });
 $("#sub").addEventListener("change",ev=>{ if(ev.target.id==="pl-sel") cambiaPlanta(ev.target.value); });
