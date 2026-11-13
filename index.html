@@ -431,6 +431,93 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
 .lg img{height:56px;margin-bottom:14px}
 .lg h2{text-align:center;font-weight:700;color:var(--ink)}
 .lg #lg-msg{text-align:center;margin-bottom:6px}
+
+/* =====================================================================
+   REDISEÑO v2 · Modern Industrial Enterprise (solo presentación)
+   Tokens corporativos MPF (inalterables): --brown #623C21 · --green #6ABF4B · --orange #EC7700
+   Tokens normativos NTP 900.058:2019 (protegidos; se aplican en línea desde BLOQUES, no se redefinen aquí):
+   --ntp-marron:#7B4A2A --ntp-azul:#1F5FBF --ntp-blanco:#FFFFFF --ntp-amarillo:#F2C500 --ntp-plomo:#8A8F94
+   --ntp-negro:#222222 --ntp-rojo:#C62828 --ntp-verde:#2E8B3D
+   ===================================================================== */
+:root{--ntp-marron:#7B4A2A;--ntp-azul:#1F5FBF;--ntp-blanco:#FFFFFF;--ntp-amarillo:#F2C500;--ntp-plomo:#8A8F94;--ntp-negro:#222222;--ntp-rojo:#C62828;--ntp-verde:#2E8B3D;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--r-sm:8px;--r:12px;--r-lg:16px;--bg:#F6F3EF;--nav:#4A2C17;--nav2:#5A3720;--t:180ms ease}
+body{background:var(--bg)}
+/* encabezado: título de la sección en uso */
+.bar h1{display:flex;flex-direction:column;gap:2px}
+.bar h1 #ptitle{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.bar small{font-size:12px}
+@media(max-width:520px){ .bar h1 #ptitle{font-size:15px} }
+/* menú lateral premium */
+.navlogo,.navcol{display:none}
+@media(min-width:1024px){
+  body:not(.simple) .tabs{background:linear-gradient(180deg,var(--brown) 0,var(--nav) 100%);padding:16px 12px 16px;gap:4px;transition:width var(--t)}
+  body:not(.simple) .tabs::before,body:not(.simple) .tabs::after{content:none}
+  body:not(.simple) .navlogo{display:flex;align-items:center;gap:10px;padding:6px 6px 18px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.12)}
+  .navlogo img{width:44px;height:44px;object-fit:contain;background:#fff;border-radius:10px;padding:4px;flex:none}
+  .navlogo b{display:block;color:#fff;font-size:14.5px;font-weight:650;letter-spacing:-.01em;line-height:1.2}
+  .navlogo small{display:block;color:rgba(255,255,255,.6);font-size:11.5px;margin-top:2px}
+  body:not(.simple) .tab{position:relative;padding:10px 12px;font-size:14px;font-weight:550}
+  body:not(.simple) .tab.on{background:rgba(255,255,255,.14);color:#fff;box-shadow:inset 3px 0 0 var(--green)}
+  body:not(.simple) .tab.on::before{background:#fff}
+  body:not(.simple) .navcol{display:flex;align-items:center;gap:10px;margin-top:auto;border:0;background:transparent;color:rgba(255,255,255,.6);padding:10px 12px;border-radius:10px;font-size:13px;text-align:left}
+  .navcol::before{content:"";width:18px;height:18px;flex:none;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") no-repeat center/contain;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15 18-6-6 6-6'/%3E%3C/svg%3E") no-repeat center/contain;transition:transform var(--t)}
+  .navcol:hover{background:rgba(255,255,255,.08);color:#fff}
+  /* contraído: solo íconos */
+  body.navmin:not(.simple){--side:76px}
+  body.navmin:not(.simple) .navlogo div,body.navmin:not(.simple) .navcol span{display:none}
+  body.navmin:not(.simple) .navlogo{justify-content:center;padding:6px 0 18px}
+  body.navmin:not(.simple) .tab{font-size:0;justify-content:center;padding:12px 0}
+  body.navmin:not(.simple) .tab::before{width:20px;height:20px}
+  body.navmin:not(.simple) .navcol{justify-content:center}
+  body.navmin:not(.simple) .navcol::before{transform:rotate(180deg)}
+  body:not(.simple) .bar .logo{display:none}
+  body:not(.simple) #app{transition:margin-left var(--t)}
+}
+/* indicadores */
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--s3)}
+.kpi{padding:var(--s4) var(--s4) var(--s4) var(--s4);border-radius:var(--r);display:flex;flex-direction:column;justify-content:center;min-height:92px}
+.kpi::before{width:0}
+.kpi::after{content:"";position:absolute;right:16px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:10px;background:var(--brown);opacity:.9;-webkit-mask:no-repeat center/22px;mask:no-repeat center/22px}
+.kpi{padding-right:72px}
+.kpi::after{background:none;-webkit-mask:none;mask:none}
+.kpi .l{margin-bottom:2px}
+.kpi .n{font-size:30px;line-height:1.1}
+.kpi[class*="ki-"]::before{content:"";position:absolute;right:16px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:10px;background:#F4ECE4;left:auto;bottom:auto}
+.kpi.warn[class*="ki-"]::before{background:#FFF1E0}
+.kpi[class*="ki-"]::after{content:"";position:absolute;right:25px;top:50%;transform:translateY(-50%);width:22px;height:22px;background:var(--brown);opacity:1;-webkit-mask:no-repeat center/contain;mask:no-repeat center/contain;border-radius:0}
+.kpi.warn[class*="ki-"]::after{background:var(--orange)}
+.kpi.ki-peso::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M5 21h14M5 7h14'/%3E%3Cpath d='M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v18M5 21h14M5 7h14'/%3E%3Cpath d='M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z'/%3E%3C/svg%3E")}
+.kpi.ki-hoja::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M8 13h8M8 17h5'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/%3E%3Cpath d='M14 3v6h6M8 13h8M8 17h5'/%3E%3C/svg%3E")}
+.kpi.ki-camion::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h11v10H3zM14 9h4l3 3v4h-7z'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h11v10H3zM14 9h4l3 3v4h-7z'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E")}
+.kpi.ki-pend::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E")}
+.kpi.ki-ok::after{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12 3 3 5-6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12 3 3 5-6'/%3E%3C/svg%3E")}
+/* despachos: tarjetas en cuadrícula en pantallas anchas */
+@media(min-width:1440px){ #d-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3);align-items:start} #d-list .dsec{grid-column:1/-1;margin-bottom:0} #d-list .dcard{margin:0} }
+.dhead{background:linear-gradient(180deg,#FFFFFF 0,#FCFAF8 100%)}
+.dfoot{border-top:1px solid #F3ECE5}
+.dfoot .btn{white-space:nowrap}
+/* tablas: desplazamiento horizontal en pantallas pequeñas, cifras alineadas */
+.screen-only{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.d{min-width:560px;font-variant-numeric:tabular-nums}
+table.d td.num,.rrow .v b,.kpi .n,.hhead .tot,.sh-tot b{font-variant-numeric:tabular-nums}
+/* formularios */
+.card h2{font-size:15px;padding-bottom:var(--s3);margin-bottom:var(--s3);border-bottom:1px solid #F3ECE5}
+.seg button{min-height:48px;border-radius:10px;font-weight:600;transition:all var(--t)}
+.seg button.on{box-shadow:0 1px 2px rgba(43,33,24,.2)}
+input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
+/* tarjetas de tipo de residuo (color NTP intacto; se mejora solo el contenedor y la legibilidad) */
+.bt{position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.10),inset 0 0 0 1px rgba(0,0,0,.08)}
+.bt span{font-size:15.5px;letter-spacing:-.01em}
+.bt small{font-weight:500}
+.bt .kgb{box-shadow:0 1px 2px rgba(0,0,0,.15)}
+/* ventanas y avisos */
+.lg .box{border:1px solid rgba(255,255,255,.4)}
+.toast{background:#2B2118}
+.warnbox{background:#FFF7EE}
+/* pestañas en celular: más compactas y legibles */
+@media(max-width:1023px){ .tabs{position:sticky;top:60px;z-index:19} .tab{padding:8px 12px;font-size:13px} }
+@media(max-width:520px){ .kpi{padding-right:16px} .kpi[class*="ki-"]::before,.kpi[class*="ki-"]::after{display:none} }
+@media(prefers-reduced-motion:reduce){.tabs,#app,.navcol::before{transition:none!important}}
 .umenu{position:fixed;z-index:70;min-width:220px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(43,33,24,.16);padding:6px;display:flex;flex-direction:column}
 .umenu .umh{padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
 .umenu .umh b{display:block;color:var(--ink);font-size:14px}.umenu .umh span{color:var(--mute);font-size:12px}
@@ -447,7 +534,7 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
 <div id="app">
   <div class="bar">
     <img class="logo" src="img/logo.png" alt="">
-    <h1>Pesaje de residuos sólidos<small id="sub"></small></h1>
+    <h1><span id="ptitle">Pesaje de residuos sólidos</span><small id="sub"></small></h1>
     <button class="chip q hidden" id="chip-q"></button>
     <span class="chip" id="chip-net"><i></i><span>Con conexión</span></span>
     <button class="chip hidden" id="chip-u" title="Mi cuenta" aria-haspopup="menu" aria-expanded="false"></button>
@@ -456,12 +543,14 @@ table.d tfoot td{background:#F6EFE8;border-bottom:0}
   <div class="qwarn noprint hidden" id="q-warn"><span id="q-txt"></span><button class="btn sm" id="q-now" type="button">Enviar ahora</button></div>
 
   <div class="tabs noprint">
+    <div class="navlogo"><img src="img/logo.png" alt="Machu Picchu Foods"><div><b>Gestión de residuos</b><small>Sistema de Gestión Ambiental</small></div></div>
     <button class="tab on" data-tab="hoja">Pesaje</button>
     <button class="tab" data-tab="desp">Despacho (SGA.R.G.001)</button>
     <button class="tab hidden" data-tab="cat" id="tab-cat">Catálogo</button>
     <button class="tab hidden" data-tab="pla" id="tab-pla">Plantas</button>
     <button class="tab hidden" data-tab="usr" id="tab-usr">Usuarios</button>
     <button class="tab hidden" data-tab="act" id="tab-act">Actividad</button>
+    <button class="navcol" id="nav-col" type="button" title="Contraer menú" aria-label="Contraer menú"><span>Contraer menú</span></button>
   </div>
 
   <!-- INICIO: tablero, nueva hoja y despachos -->
@@ -977,6 +1066,8 @@ function showView(){
   $("#v-act").classList.toggle("hidden",TAB!=="act");
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
+  const tOn=document.querySelector(".tab.on");      // título de la sección en uso (solo presentación)
+  $("#ptitle").textContent = inHoja ? (SIMPLE()?"Pesaje":"Hoja de pesaje") : (SIMPLE()?"Pesaje de residuos":(tOn?tOn.textContent.trim():"Pesaje de residuos sólidos"));
   window.scrollTo(0,0);
 }
 
@@ -1062,11 +1153,11 @@ function drawHojas(){
   const porAprobar=all.filter(g=>!aprobada(g.hojas[0])&&g.hojas.some(conDatos)&&g.hojas.filter(conDatos).every(h=>h.estado==="cerrada")).length;
   const abiertas=HOJAS.filter(h=>h.estado!=="cerrada"&&!aprobada(h)).length;
   const aprobHoy=all.filter(g=>g.fecha===hoy&&aprobada(g.hojas[0])).length;
-  $("#kpis").innerHTML=`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div>
-    <div class="kpi"><div class="l">Hojas abiertas</div><div class="n">${abiertas}</div></div>`;
+  $("#kpis").innerHTML=`<div class="kpi ki-peso"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div>
+    <div class="kpi ki-hoja"><div class="l">Hojas abiertas</div><div class="n">${abiertas}</div></div>`;
   const enCurso=all.filter(g=>g.fecha===hoy&&!aprobada(g.hojas[0])).length;
-  $("#d-kpis").innerHTML=(SUPERV()?`<div class="kpi"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div><div class="kpi"><div class="l">Camiones en curso</div><div class="n">${enCurso}</div></div>`:"")+`<div class="kpi ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
-    <div class="kpi"><div class="l">Aprobados hoy</div><div class="n">${aprobHoy}</div></div>`;
+  $("#d-kpis").innerHTML=(SUPERV()?`<div class="kpi ki-peso"><div class="l">Pesado hoy</div><div class="n">${fmt(kgHoy)} <small>kg</small></div></div><div class="kpi ki-camion"><div class="l">Camiones en curso</div><div class="n">${enCurso}</div></div>`:"")+`<div class="kpi ki-pend ${porAprobar?"warn":""}"><div class="l">Por aprobar</div><div class="n">${porAprobar} <small>despacho${porAprobar===1?"":"s"}</small></div></div>
+    <div class="kpi ki-ok"><div class="l">Aprobados hoy</div><div class="n">${aprobHoy}</div></div>`;
   const multi=g=>g.viaje>1||all.some(x=>x.fecha===g.fecha&&x.placa===g.placa&&x.viaje>1);
   const tit=g=>esc(g.placa)+(multi(g)?` · Viaje ${g.viaje}`:"");
   const estado=g=>{ const ap=aprobada(g.hojas[0]), todasCerr=g.hojas.filter(conDatos).every(h=>h.estado==="cerrada");
@@ -2049,6 +2140,9 @@ $("#lg-form").addEventListener("submit",doLogin);
 $("#cta-form").addEventListener("submit",doCta);
 $("#cta-x").addEventListener("click",()=>$("#cta").classList.add("hidden"));
 $("#cta-out").addEventListener("click",cerrarSesion);
+try{ if(localStorage.getItem("ui.navmin")==="1") document.body.classList.add("navmin"); }catch(e){}
+document.querySelectorAll(".tabs .tab").forEach(t=>{ if(!t.title) t.title=t.textContent.trim(); });
+$("#nav-col").addEventListener("click",()=>{ const m=document.body.classList.toggle("navmin"); try{ localStorage.setItem("ui.navmin",m?"1":"0"); }catch(e){} });
 function toggleUMenu(abrir){
   const m=$("#umenu"), c=$("#chip-u"), ab=abrir!==undefined?abrir:m.classList.contains("hidden");
   if(ab){ const b=c.getBoundingClientRect(); m.style.top=(b.bottom+6)+"px"; m.style.right=Math.max(8,innerWidth-b.right)+"px";
