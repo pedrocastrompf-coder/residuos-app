@@ -1947,6 +1947,7 @@ async function drawUsuarios(){
       ${plantasAct().length>1?`<div class="plchk" style="margin-top:6px"><span class="muted">Alcance:</span>${u.rol==="Administrador"?'<b>Todas las plantas</b>':(()=>{ const tod=(u.plantas||[]).includes("*");
         return `<label><input type="checkbox" data-upl="${esc(u.usuario)}" value="*"${tod?" checked":""}> <b>Todas</b></label>`+plantasAct().map(p=>`<label class="${tod?"off2":""}"><input type="checkbox" data-upl="${esc(u.usuario)}" value="${esc(p.planta)}"${tod||(u.plantas||[]).includes(p.planta)?" checked":""}${tod?" disabled":""}> ${esc(p.planta)}</label>`).join(""); })()}</div>`:""}
       <div class="acts"><select class="in" data-urol="${esc(u.usuario)}">${["Operador","Inspector","Administrador"].map(r=>`<option${r===u.rol?" selected":""}>${r}</option>`).join("")}</select>
+      <button class="btn sec sm2" data-unom="${esc(u.usuario)}">Cambiar nombre</button>
       <button class="btn sec sm2" data-ures="${esc(u.usuario)}">Resetear contraseña</button>
       <button class="btn sec sm2" data-uact="${esc(u.usuario)}">${u.activo?"Desactivar":"Activar"}</button></div></div>`).join("")||"Sin usuarios.";
   }catch(x){ L.textContent="Sin conexión con el Google Sheet."; }
@@ -2050,7 +2051,10 @@ $("#pl-list").addEventListener("click",ev=>{
   if(ac){ const n=ac.dataset.plact, p=PLANTAS.find(x=>x.planta===n); if(p&&confirm((p.activo!==false?"¿Desactivar la planta ":"¿Activar la planta ")+n+"?"+(p.activo!==false?"\nSus registros se conservan en su Google Sheet.":""))) plaOp({action:"planta_editar",planta:n,activo:p.activo===false},p.activo!==false?"Planta desactivada.":"Planta activada."); }
 });
 $("#u-list").addEventListener("click",ev=>{
-  const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]");
+  const rs=ev.target.closest("[data-ures]"), ac=ev.target.closest("[data-uact]"), nm=ev.target.closest("[data-unom]");
+  if(nm){ const u=nm.dataset.unom, x=USRS.find(z=>z.usuario===u); const n=prompt("Nombre y apellido de "+u+":",x?x.nombre:"");
+    if(n===null) return; const t=n.trim().replace(/\s+/g," "); if(t.split(" ").length<2) return toast("Ingrese nombre y apellido.");
+    usrOp({action:"usuario_editar",usuario:u,nombre:t},"Nombre actualizado."+(SES&&SES.usuario===u?" Se verá al volver a iniciar sesión.":"")); return; }
   if(rs){ const u=rs.dataset.ures, c=claveAzar(); if(confirm("¿Resetear la contraseña de "+u+"?\nSe cerrarán sus sesiones abiertas.")) usrOp({action:"usuario_resetear",usuario:u,clave:c}).then(ok=>{ if(ok) alert("Contraseña temporal de "+u+": "+c+"\nEntréguela a la persona: deberá cambiarla al ingresar."); }); }
   if(ac){ const u=ac.dataset.uact, x=USRS.find(z=>z.usuario===u); if(x&&confirm((x.activo?"¿Desactivar a ":"¿Activar a ")+x.nombre+"?")) usrOp({action:"usuario_editar",usuario:u,activo:!x.activo},x.activo?"Usuario desactivado.":"Usuario activado."); }
 });
