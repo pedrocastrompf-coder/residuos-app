@@ -580,9 +580,9 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
     <div class="kpis" id="kpis"></div>
     <div class="homegrid">
       <div>
-        <button class="btn" id="b-new">+ Nueva hoja de pesaje</button>
+        <button class="btn" id="b-new">+ Iniciar despacho</button>
         <div class="card newcard" id="n-card">
-          <h2>Nueva hoja de pesaje</h2>
+          <h2>Iniciar despacho</h2>
           <label class="f">Puerta</label>
           <div class="seg" id="n-puerta"></div>
           <label class="f" for="n-fecha">Fecha</label>
@@ -738,8 +738,8 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
 </div>
 
 <div class="dock hidden" id="dock">
-  <button class="btn sec" id="b-back">← Hojas</button>
-  <button class="btn" id="b-close">Cerrar hoja y enviar</button>
+  <button class="btn sec" id="b-back">← Atrás</button>
+  <button class="btn" id="b-close">✓ Finalizar pesaje</button>
 </div>
 
 <!-- Pesadas de un residuo -->
@@ -747,7 +747,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
   <div class="sheet-in">
     <div class="sh-head">
       <div class="t"><span id="sh-name"></span><small id="sh-sap"></small></div>
-      <button class="ib back" id="sh-x" aria-label="Volver a la lista">↩ Volver a la lista</button>
+      <button class="ib back" id="sh-x" aria-label="Atrás">← Atrás</button>
     </div>
     <div class="sh-tot"><span>Total de este residuo</span><span><b id="sh-kg">0</b> kg <span class="muted" id="sh-un"></span></span></div>
     <ol class="pl" id="sh-list"></ol>
@@ -768,7 +768,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
       <div class="stick">
         <div class="row2">
           <button class="btn sec hidden" id="f-cancel">Cancelar edición</button>
-          <button class="btn" id="f-add">Agregar pesada</button>
+          <button class="btn" id="f-add">Guardar pesada</button>
         </div>
       </div>
     </div>
@@ -1216,8 +1216,8 @@ function drawHojas(){
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
       ${SUPERV()?svDetalle(g):""}<div class="pchs">${chips}</div>
-      <div class="dfoot">${(()=>{ const cz=ap||SUPERV()?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Cerrar ${cz.length} hoja${cz.length>1?"s":""} abierta${cz.length>1?"s":""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.filter(conDatos).every(h=>h.estado==="cerrada")&&g.hojas.some(conDatos);
-        return ap?`<button class="btn sm" data-gdesp="${k}">Ver despacho</button>`:listo?`<button class="btn sm" data-gdesp="${k}">Generar despacho</button>`:`<button class="btn sm" disabled style="opacity:.5">Generar despacho</button><div class="muted" style="width:100%;text-align:right;font-size:11.5px">Cierre las hojas abiertas para generarlo.</div>`; })()}</div></div>`;
+      <div class="dfoot">${(()=>{ const cz=ap||SUPERV()?[]:g.hojas.filter(h=>h.estado!=="cerrada"&&!ajena(h)&&(h.pesadas||[]).length&&!pendHoja(h)); return cz.length?`<button class="btn sec sm" data-gcerrar="${g.fecha}|${esc(g.placa)}|${g.viaje}">Finalizar pesaje${cz.length>1?` (${cz.length} hojas)`:""}</button> `:""; })()}${(()=>{ const k=`${g.fecha}|${esc(g.placa)}|${g.viaje}`, listo=g.hojas.filter(conDatos).every(h=>h.estado==="cerrada")&&g.hojas.some(conDatos);
+        return ap?`<button class="btn sm" data-gdesp="${k}">Ver despacho</button>`:listo?`<button class="btn sm" data-gdesp="${k}">Generar registro de despacho</button>`:`<button class="btn sm" disabled style="opacity:.5">Generar registro de despacho</button><div class="muted" style="width:100%;text-align:right;font-size:11.5px">Cierre las hojas abiertas para generarlo.</div>`; })()}</div></div>`;
   };
   const ord=all.sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
   const hoyG=ord.filter(g=>g.fecha===hoy), antG=ord.filter(g=>g.fecha!==hoy).slice(0,12);
@@ -1244,7 +1244,7 @@ async function startHoja(viajeFijo){
   let v;
   if(viajeFijo){
     v=vj(viajeFijo); await aprobFresco({fecha,placa,viaje:v});
-    if(aprobada({fecha,placa,viaje:v})) return void(e.textContent="El Viaje "+v+" de "+placa+" ya fue aprobado. Para un nuevo viaje, use «Nueva hoja de pesaje».");
+    if(aprobada({fecha,placa,viaje:v})) return void(e.textContent="El Viaje "+v+" de "+placa+" ya fue aprobado. Para un nuevo viaje, use «Iniciar despacho».");
   } else {
     // viaje vigente = el último de este vehículo en la fecha; si ya está aprobado, se propone un viaje nuevo
     const v0=Math.max(1,...locV); v=v0;
@@ -1467,8 +1467,8 @@ function drawHoja(){
     return `<div class="bw ${abre?"open":""}"><button class="bt ${b.esp?"esp":""}" data-b="${b.id}" style="${st}"><span>${esc(b.t)}</span><small>${o.todos.length?o.todos.length+" residuo"+(o.todos.length>1?"s":""):"sin residuos"} · NTP ${esc(b.ntp)}</small>${kg?`<span class="kgb">${fmt(kg)} kg</span>`:""}</button>${cuerpo}</div>`;
   }).join("")+`</div>`;
   $("#lista").innerHTML = html || `<div class="card muted">Sin resultados.</div>`;
-  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":(S?"✓ Finalizar pesaje":"Cerrar hoja y enviar"); b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(ajena(H)||(H.estado!=="cerrada"&&!H.pesadas.length))));
-  $("#b-back").textContent=S?"← Atrás":"← Hojas";
+  const b=$("#b-close"); b.textContent = H.estado==="cerrada"?"Reabrir hoja":"✓ Finalizar pesaje"; b.classList.toggle("warn",H.estado==="cerrada"); b.classList.toggle("hidden",ap||(S&&(ajena(H)||(H.estado!=="cerrada"&&!H.pesadas.length))));
+  $("#b-back").textContent="← Atrás";
 }
 
 async function cerrarGrupo(f,pl,v){
@@ -1521,7 +1521,7 @@ function openSheet(key){
 function closeSheet(){ $("#sheet").classList.add("hidden"); CUR=null; EDIT=null; drawHoja(); }
 function resetForm(){
   EDIT=null; $("#f-bruto").value=""; $("#f-uni").value=""; $("#f-otra").value=""; $("#f-err").textContent="";
-  $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent=SIMPLE()?"Guardar pesada":"Agregar pesada"; $("#f-cancel").classList.add("hidden");
+  $("#f-title").textContent="Nueva pesada"; $("#f-add").textContent="Guardar pesada"; $("#f-cancel").classList.add("hidden");
   if(TARA.t==="val"&&TARA.v!=null) $("#f-otra").value=TARA.v;   // la última tara usada queda escrita
   drawTaras(); drawPrev();
 }
@@ -1757,7 +1757,7 @@ function drawDespacho(fecha,placa,hojas,origen){
   const tp=porPuerta.map(p=>r2(filas.reduce((a,r)=>a+(r.pp[p]||0),0)));
   const gt=r2(tp.reduce((a,b)=>a+b,0));
   $("#d-out").innerHTML = `
-    <div class="noprint" style="margin:0 0 8px"><button class="btn sec sm" id="d-back">← Volver a la lista</button></div>
+    <div class="noprint" style="margin:0 0 8px"><button class="btn sec sm" id="d-back">← Atrás</button></div>
     <div class="card noprint"><h2 style="margin:0 0 2px">Despacho ${esc(placa)}${DVIAJE>1?" · Viaje "+DVIAJE:""}</h2><div class="muted">${fechaCorta(fecha)} · ${esc(origen)}</div><div class="st">${st}</div>
       ${pend?`<div class="warnbox">⚠ Hay ${pend} pesada${pend>1?"s":""} con tara pendiente: el consolidado incluye su peso bruto.</div>`:""}
       <div class="muted" style="margin-top:8px">Datos del vehículo tomados del pesaje (solo se completan los que falten). Luego elija el tipo de manejo y escriba las observaciones; se imprimen en el SGA.R.G.001 y se registran en el Registro Interno.</div>
@@ -1853,7 +1853,7 @@ function aprobHTML(hayPesadas,sinHoja){
   const top=ap?`<div class="okbox">✔ Despacho aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
               :`<div class="muted">Estado: <b>Pendiente de aprobación</b>. Al aprobar, se registra en el Registro Interno y alimenta el dashboard.</div>`;
   return `<div class="card noprint" id="apr">${top}
-    ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar y pasar al Registro Interno"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
+    ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar despacho"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
     <div id="a-box" class="hidden" data-modo="${ap?"reabrir":"aprobar"}">
       <div class="muted" style="margin-top:6px">${ap?"Reabre":"Aprueba"}: <b>${esc(SES?SES.nombre:"")}</b> (queda registrado)</div>
       ${ap?`<label class="f" for="a-clave">Ingrese su clave para reabrir</label>
