@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF">
 <link rel="preload" href="fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-<title>Pesaje de residuos sólidos</title>
+<title>Gestión de residuos sólidos</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="img/icon-192.png">
 <link rel="apple-touch-icon" href="img/icon-192.png">
@@ -536,7 +536,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
 <div id="app">
   <div class="bar">
     <img class="logo" src="img/logo.png" alt="">
-    <h1><span id="ptitle">Pesaje de residuos sólidos</span><small id="sub"></small></h1>
+    <h1><span id="ptitle">Gestión de residuos sólidos</span><small id="sub"></small></h1>
     <button class="chip q hidden" id="chip-q"></button>
     <span class="chip" id="chip-net"><i></i><span>Con conexión</span></span>
     <button class="chip hidden" id="chip-u" title="Mi cuenta" aria-haspopup="menu" aria-expanded="false"></button>
@@ -758,7 +758,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
 <div class="lg hidden" id="login">
   <form class="box" id="lg-form" autocomplete="on">
     <img src="img/logo.png" alt="">
-    <h2>Pesaje de residuos sólidos</h2>
+    <h2>Gestión de residuos sólidos</h2>
     <div class="muted" id="lg-msg">Ingrese con su usuario y contraseña.</div>
     <label class="f" for="lg-u">Usuario</label>
     <input id="lg-u" class="in" autocomplete="username" autocapitalize="none" spellcheck="false">
@@ -1069,7 +1069,7 @@ function showView(){
   $("#dock").classList.toggle("hidden",!inHoja);
   $$(".tab").forEach(b=>b.classList.toggle("on",b.dataset.tab===TAB));
   const tOn=document.querySelector(".tab.on");      // título de la sección en uso (solo presentación)
-  $("#ptitle").textContent = inHoja ? (SIMPLE()?"Pesaje":"Hoja de pesaje") : (SIMPLE()?"Pesaje de residuos":(tOn?tOn.textContent.trim():"Pesaje de residuos sólidos"));
+  $("#ptitle").textContent = inHoja ? (SIMPLE()?"Pesaje":"Hoja de pesaje") : (SIMPLE()?"Pesaje de residuos":(tOn?tOn.textContent.trim():"Gestión de residuos sólidos"));
   window.scrollTo(0,0);
 }
 
