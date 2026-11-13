@@ -847,6 +847,7 @@ function drawHojas(){
       if(!hs.length) return ap||SUPERV()?`<span class="pch sh">${esc(pc)} sin hoja</span>`:`<button class="pch sh" data-newp="${esc(p)}|${g.fecha}|${esc(g.placa)}|${g.viaje}">${esc(pc)} sin hoja · + crear</button>`;
       if(SUPERV()) return "";   // el detalle por puerta ya está arriba
       const cerr=hs.every(h=>h.estado==="cerrada");
+      if(can("reabrir")) return hs.map(h=>`<button class="pch ${ap?"ok":h.estado==="cerrada"?"ce":"ab"}" data-open="${h.id}" title="Abrir la hoja">${esc(pc)} ${ap?"✓":h.estado==="cerrada"?"cerrada":"abierta"} · ${ap?"ver":"editar"} ›</button>`).join("");
       return `<span class="pch ${ap?"ok":cerr?"ce":"ab"}">${esc(pc)} ${ap?"✓":cerr?"cerrada":"abierta"}</span>`;
     }).join("");
     return `<div class="dcard"><div class="dhead"><div class="t"><b>${tit(g)}</b><div class="muted">${fechaCorta(g.fecha)} · ${fmt(kgG(g))} kg en total</div></div>${estado(g)}</div>
