@@ -648,7 +648,7 @@ input[type=date].in,input[type=time].in{font-variant-numeric:tabular-nums}
     <details class="card noprint" id="d-consult">
       <summary style="cursor:pointer;font-weight:700;color:var(--brown)">Buscar despacho de otro día</summary>
       <label class="f" for="d-num">N.° de registro</label>
-      <div style="display:flex;gap:8px"><input id="d-num" class="in" type="text" inputmode="numeric" autocomplete="off" placeholder="Ej.: 000123" style="flex:1"><button class="btn" id="d-numgo" type="button" style="width:auto;padding:0 18px">Buscar</button></div>
+      <div style="display:flex;gap:8px"><input id="d-num" class="in" type="text" inputmode="numeric" autocomplete="off" placeholder="Ej.: C1-000123" style="flex:1"><button class="btn" id="d-numgo" type="button" style="width:auto;padding:0 18px">Buscar</button></div>
       <div class="err" id="d-numerr"></div>
       <div class="muted" style="margin:12px 0 0;text-align:center">— o por fecha —</div>
       <div class="muted" style="margin-top:6px">Elija la fecha y verá los despachos de ese día. La placa y el viaje son opcionales: sirven solo para acotar la búsqueda.</div>
@@ -1616,15 +1616,19 @@ function buildDespacho(hojas){
   return {porPuerta,filas};
 }
 /* búsqueda por fecha (placa y viaje opcionales): lista los despachos de ese día */
+/* N.° de registro: código de planta + correlativo (C1-000123). Código = inicial + número de la planta: Callao 1 → C1, Pisco 2 → P2 */
+const codPlanta=p=>{ const m=String(p||"").trim().match(/^(\S)\S*\s*(\d*)/); return m?(m[1]+m[2]).toUpperCase():""; };
+const numReg=(n,p)=>n?codPlanta(p||CFG.PLANTA)+"-"+String(n).padStart(6,"0"):"";
 /* búsqueda por N.° de registro: el «DNI» del despacho */
 async function buscarPorNumero(){
-  const e=$("#d-numerr"), n=parseInt(($("#d-num").value||"").replace(/\D/g,""),10); e.textContent="";
+  const e=$("#d-numerr"), txt=($("#d-num").value||"").trim().toUpperCase(), pre=(txt.match(/^([A-Z]+\d*)\s*-/)||[])[1], n=parseInt(txt.replace(/^[A-Z]+\d*\s*-/,"").replace(/\D/g,""),10); e.textContent="";
   if(!n) return void(e.textContent="Escriba el N.° de registro.");
+  if(pre&&pre!==codPlanta(CFG.PLANTA)) return void(e.textContent="El N.° "+txt+" no es de "+CFG.PLANTA+" ("+codPlanta(CFG.PLANTA)+"). Cambie de planta arriba y vuelva a buscar.");
   if(!CFG.SCRIPT_URL||!navigator.onLine) return void(e.textContent="Requiere conexión con el Google Sheet.");
   const bt=$("#d-numgo"); bt.disabled=true;
   try{
     const j=await getJ({action:"buscar_numero",numero:n});
-    if(!j||!j.ok) return void(e.textContent=j&&j.error==="no_existe"?"No hay un despacho con el N.° "+String(n).padStart(6,"0")+" en "+CFG.PLANTA+".":"No se pudo buscar. Reintente.");
+    if(!j||!j.ok) return void(e.textContent=j&&j.error==="no_existe"?"No hay un despacho con el N.° "+numReg(n)+" en "+CFG.PLANTA+".":"No se pudo buscar. Reintente.");
     $("#d-fecha").value=j.fecha; $("#d-placa").value=j.placa; $("#d-viaje").value=j.viaje; $("#d-num").value="";
     return consultarDespacho();
   }catch(x){ e.textContent="Sin conexión con el Google Sheet. Reintente."; }
@@ -1689,7 +1693,7 @@ async function pdfDespacho(){
     const M=8, W=210-2*M, Hmax=297-2*M, r=Math.min(W/cv.width, Hmax/cv.height);   // siempre en UNA hoja A4
     pdf.addImage(cv.toDataURL("image/jpeg",0.92),"JPEG",M+(W-cv.width*r)/2,M,cv.width*r,cv.height*r);
     const [f,pl,v]=DKEY.split("|");
-    const nombre=`SGA.R.G.001${DSTATE&&DSTATE.num?" N"+String(DSTATE.num).padStart(6,"0"):""} ${pl}${vj(v)>1?" viaje "+vj(v):""} ${fechaCorta(f).replace(/\//g,"-")} ${CFG.PLANTA}.pdf`;
+    const nombre=`SGA.R.G.001${DSTATE&&DSTATE.num?" "+numReg(DSTATE.num):""} ${pl}${vj(v)>1?" viaje "+vj(v):""} ${fechaCorta(f).replace(/\//g,"-")} ${CFG.PLANTA}.pdf`;
     return {file:new File([pdf.output("blob")],nombre,{type:"application/pdf"}),texto:`Control de despacho de residuos sólidos (SGA.R.G.001) · ${CFG.PLANTA} · ${pl} · ${fechaCorta(f)}`,k:DKEY};
   } finally { w.remove(); }
 }
@@ -1736,7 +1740,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
   // no peligrosos: solo las categorías con algo pesado, repartidas en dos columnas parejas
   const catsNP=C1.concat(C2).filter(c=>itemsDe(c).length), totNP=filasDe(catsNP); let acu=0; const colA=[], colB=[];
   catsNP.forEach(c=>{ (acu<totNP/2?colA:colB).push(c); acu+=filasDe([c]); });
-  const numReg=DSTATE&&DSTATE.num?String(DSTATE.num).padStart(6,"0"):"";
+  const nReg=DSTATE&&DSTATE.num?numReg(DSTATE.num):"";
   return `<div class="off ${DSTATE&&DSTATE.estado==="Aprobado"?"":"noap"}" style="--esc:${escala}">
     <table class="of ohead"><tr>
       <td rowspan="3" style="width:17%;text-align:center"><img src="img/logo.png" alt="" style="height:44px"></td>
@@ -1744,7 +1748,7 @@ function officialHTML(fecha,placa,filas,tipoRes){
       <td style="width:15%"><b>Código:</b></td><td style="width:13%;text-align:center"><b>${esc(F.codigo||"SGA.R.G.001")}</b></td></tr>
       <tr><td><b>Versión:</b></td><td style="text-align:center"><b>${esc(F.version||"05")}</b></td></tr>
       <tr><td><b>Fecha de aprobación:</b></td><td style="text-align:center"><b>${esc(F.aprobacion||"")}</b></td></tr></table>
-    ${numReg?`<div class="onum">N.° de registro: <b>${numReg}</b></div>`:""}
+    ${nReg?`<div class="onum">N.° de registro: <b>${nReg}</b></div>`:""}
     <table class="og">
       <tr><td><b>Fecha de registro:</b> ${fechaCorta(fecha)}</td><td><b>Empresa Operadora:</b> <span id="ph-op"></span></td><td><b>Sede:</b> ${esc(CFG.PLANTA)}</td></tr>
       <tr><td><b>Tipo de residuo:</b> ${esc(tipoRes)}</td><td><b>Conductor:</b> <span id="ph-cond"></span></td><td><b>Placa de vehículo:</b> ${esc(placa)}${DVIAJE>1?" · Viaje "+DVIAJE:""}</td></tr>
@@ -1874,7 +1878,7 @@ function aprobHTML(hayPesadas,sinHoja){
   if(!hayPesadas) return "";
   if(!CFG.SCRIPT_URL) return `<div class="card noprint muted">Aprobación no disponible: configurar SCRIPT_URL y CLAVE en config.js.</div>`;
   const ap=DSTATE&&DSTATE.estado==="Aprobado";
-  const top=ap?`<div class="okbox">✔ Despacho${DSTATE.num?" N.° <b>"+String(DSTATE.num).padStart(6,"0")+"</b>":""} aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
+  const top=ap?`<div class="okbox">✔ Despacho${DSTATE.num?" N.° <b>"+numReg(DSTATE.num)+"</b>":""} aprobado por <b>${esc(DSTATE.por||"")}</b>${DSTATE.en?" el "+fechaCorta(DSTATE.en):""}. Ya está en el Registro Interno.</div>`
               :`<div class="muted">Estado: <b>Pendiente de aprobación</b>. Al aprobar, se registra en el Registro Interno y alimenta el dashboard.</div>`;
   return `<div class="card noprint" id="apr">${top}
     ${can(ap?"reabrir":"aprobar")?`<button class="btn ${ap?"sec":""}" id="a-open" style="margin-top:8px">${ap?"Reabrir despacho":"Aprobar despacho"}</button>`:`<div class="muted" style="margin-top:8px">🔒 ${ap?"Reabrir":"Aprobar"} requiere el rol Inspector o Administrador.</div>`}
