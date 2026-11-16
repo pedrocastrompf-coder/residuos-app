@@ -1007,10 +1007,22 @@ async function bajaVehiculos(){
   const m=LS.get(VEHS,{}); (j.vehiculos||[]).forEach(v=>{ m[normPlaca(v.placa)]={empresa:v.empresa,conductor:v.conductor,brevete:v.brevete||""}; }); LS.set(VEHS,m); drawVeh();
 }
 let LASTPEND=0;
+/* si se reiniciaron los datos de prueba en el Google Sheet, este equipo borra lo que tenía guardado de esta planta */
+async function purgaSiReinicio(ver){
+  const k="pesaje.datosver@"+CFG.PLANTA; let antes=null; try{ antes=localStorage.getItem(k); }catch(e){}
+  ver=String(ver||"1"); if((antes||"1")===ver){ try{ localStorage.setItem(k,ver); }catch(e){} return false; }
+  for(const h of HOJAS.slice()){ if(H&&H.id===h.id) continue; await DB.del(h.id); }
+  HOJAS=HOJAS.filter(h=>H&&H.id===h.id);
+  [APRK,VEHK,DESPQ,VEHS,"pesaje.nums"].forEach(x=>LS.set(x,x===VEHS?{}:{}));
+  try{ localStorage.setItem(k,ver); }catch(e){}
+  drawQueue(); drawHojas(); if(SIMPLE()){ OP={v:"inicio",k:null}; drawOp(); }
+  toast("Se reiniciaron los datos de prueba: este equipo quedó limpio.");
+  return true;
+}
 function refrescaDia(){
   if(!CFG.SCRIPT_URL||!navigator.onLine||(AUTH&&!SES)||(SES&&SES.cambiar)) return Promise.resolve();
   if(bajando) return bajando;
-  bajando=(async()=>{ try{ if(syncing) await syncing; const fs=[...new Set([todayStr(),$("#n-fecha").value].filter(Boolean))]; for(const f of fs) await bajaDia(f); if(SIMPLE()&&Date.now()-LASTPEND>600000){ LASTPEND=Date.now(); const jp=await getJ({action:"pendientes"}); if(jp&&jp.ok) for(const f of jp.fechas) if(!fs.includes(f)) await bajaDia(f); if(OP.v==="inicio") drawOp(); } if(Date.now()-LASTVEH>600000){ await bajaVehiculos(); LASTVEH=Date.now(); } }catch(e){} })().then(()=>{ bajando=null; });
+  bajando=(async()=>{ try{ if(syncing) await syncing; const fs=[...new Set([todayStr(),$("#n-fecha").value].filter(Boolean))]; for(const f of fs) await bajaDia(f); if(Date.now()-LASTPEND>600000){ LASTPEND=Date.now(); const jp=await getJ({action:"pendientes"}); if(jp&&jp.ok){ if(await purgaSiReinicio(jp.ver)) for(const f of fs) await bajaDia(f); if(SIMPLE()) for(const f of jp.fechas) if(!fs.includes(f)) await bajaDia(f); if(SIMPLE()&&OP.v==="inicio") drawOp(); } } if(Date.now()-LASTVEH>600000){ await bajaVehiculos(); LASTVEH=Date.now(); } }catch(e){} })().then(()=>{ bajando=null; });
   return bajando;
 }
 async function saveHoja(h){ delete h.nuevo; h.rev=(h.rev||0)+1; h.act=Date.now(); await DB.put(h); drawQueue(); sync(); }
