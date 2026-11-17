@@ -916,7 +916,8 @@ const AUTH=!!CFG.SCRIPT_URL;                // sin Google Sheet conectado la app
 let SES=LS.get(SESK,null);
 if(SES&&SES.exp&&SES.exp<Date.now()) SES=null;
 const tok=()=>SES?SES.token:"";
-const PERM={aprobar:["Operador","Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Operador","Inspector","Administrador"],borrarHoja:["Operador","Inspector","Administrador"],catalogo:["Inspector","Administrador"],plantas:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"],hallazgo_reportar:["Operador","Responsable de área","Inspector","Administrador"],hallazgo_asignar:["Inspector","Administrador"],hallazgo_cerrar:["Responsable de área","Inspector","Administrador"],hallazgo_reabrir:["Inspector","Administrador"],areas_admin:["Inspector","Administrador"]};
+const HZ_ROLES=["Administrador"];   // Hallazgos en desarrollo: solo el Administrador (para abrirlo a más roles, ampliar esta lista y en Code.gs la línea «en desarrollo»)
+const PERM={aprobar:["Operador","Inspector","Administrador"],reabrir:["Inspector","Administrador"],manejo:["Operador","Inspector","Administrador"],borrarHoja:["Operador","Inspector","Administrador"],catalogo:["Inspector","Administrador"],plantas:["Inspector","Administrador"],usuarios:["Administrador"],actividad:["Administrador"],hallazgo_reportar:HZ_ROLES,hallazgo_asignar:HZ_ROLES,hallazgo_cerrar:HZ_ROLES,hallazgo_reabrir:HZ_ROLES,areas_admin:HZ_ROLES};
 const SIMPLE=()=>AUTH&&!!SES&&SES.rol==="Operador";
 const RESP=()=>AUTH&&!!SES&&SES.rol==="Responsable de área";   // solo usa Hallazgos
 const SUPERV=()=>false;   // el Inspector ya pesa: usa la misma vista que el Administrador   // el Inspector supervisa: no pesa, abre en Despacho
@@ -1402,7 +1403,7 @@ function drawOp(){
     <div class="opt">Pendientes${lista.length?` (${lista.length})`:""}</div>`+
     (lista.length?lista.map(card).join(""):`<div class="card muted">No hay camiones pendientes. Cuando llegue uno, toque «Iniciar despacho».</div>`)+
     (aps.length?`<div class="opt">Aprobados hoy (${aps.length})</div>`+aps.map(c=>`<button class="aprow" data-gdesp="${esc(c.k)}"><b>${esc(c.placa)}</b><span class="k">${N[dkey(c.fecha,c.placa,c.viaje)]?numReg(N[dkey(c.fecha,c.placa,c.viaje)])+" · ":""}${fmt(kgC(c))} kg</span><span class="ok">Ver registro ›</span></button>`).join(""):"")+
-    `<button class="opsrch" data-op="buscarreg">🔍 Buscar un despacho anterior</button><button class="opsrch" data-hz-ir="1">⚠ Reportar un hallazgo ambiental</button>`;
+    `<button class="opsrch" data-op="buscarreg">🔍 Buscar un despacho anterior</button>${can("hallazgo_reportar")?`<button class="opsrch" data-hz-ir="1">⚠ Reportar un hallazgo ambiental</button>`:""}`;
 }
 /* operario: buscar un despacho anterior por N.° de registro o por fecha */
 function drawOpBuscar(){
