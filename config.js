@@ -26,6 +26,10 @@ window.APP_CONFIG = {
   // Tipos de manejo del despacho (los del SGA.R.G.001)
   TIPOS_MANEJO: ["Comercialización - Disposición final","Comercialización","Disposición final","Donación (Aniquem)","Valorización","Tratamiento - Valorización - Disp. final"],
 
+  // Hallazgos ambientales: tipos y niveles de riesgo (deben coincidir con los de Hallazgos.gs)
+  TIPOS_HALLAZGO: ["Residuos","Agua y efluentes","Emisiones y olores","Derrames y químicos","Energía","Orden y limpieza","Otro"],
+  RIESGOS_HALLAZGO: ["Bajo","Medio","Alto"],
+
   // Unidades de conteo (opcional en cada pesada)
   UNIDADES: [["B","Bolsas"],["C","Cajas"],["UD","Unidades"]],
 
